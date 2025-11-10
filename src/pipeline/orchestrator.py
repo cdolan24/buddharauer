@@ -4,7 +4,7 @@ Handles document processing, chunking, and vector storage with error recovery.
 """
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 import asyncio
 import time
 from datetime import datetime
@@ -12,6 +12,7 @@ from datetime import datetime
 from src.pipeline.chunker import ChunkPipeline, TextChunk
 from src.database.vector_store import VectorStore
 from src.utils.logging import get_logger
+from src.pipeline.recovery import RecoveryManager, with_retry
 
 logger = get_logger(__name__)
 
@@ -26,15 +27,30 @@ class ProcessingStats:
     total_tokens: int
     processing_time: float
     errors: Dict[str, str]  # file -> error message
+    retry_successes: int    # Files that succeeded after retries
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert stats to dictionary for persistence."""
+        return {
+            'total_files': self.total_files,
+            'successful_files': self.successful_files,
+            'failed_files': self.failed_files,
+            'total_chunks': self.total_chunks,
+            'total_tokens': self.total_tokens,
+            'processing_time': self.processing_time,
+            'errors': self.errors,
+            'retry_successes': self.retry_successes
+        }
 
 
 class PipelineOrchestrator:
-    """Orchestrates the document processing pipeline."""
+    """Orchestrates the document processing pipeline with resilient error recovery."""
     
     def __init__(self,
                  chunk_pipeline: ChunkPipeline,
                  vector_store: VectorStore,
-                 batch_size: int = 32):
+                 batch_size: int = 32,
+                 state_dir: Optional[Path] = None):
         """
         Initialize the orchestrator.
         
@@ -42,15 +58,46 @@ class PipelineOrchestrator:
             chunk_pipeline: Pipeline for processing PDFs into chunks
             vector_store: Vector store for saving embeddings
             batch_size: Number of chunks to process at once
+            state_dir: Directory for storing recovery state
         """
         self.chunk_pipeline = chunk_pipeline
         self.vector_store = vector_store
         self.batch_size = batch_size
-        self.stats = ProcessingStats(0, 0, 0, 0, 0, 0.0, {})
+        self.stats = ProcessingStats(0, 0, 0, 0, 0, 0.0, {}, 0)
+        
+        # Initialize recovery manager
+        if state_dir is None:
+            state_dir = Path("data/recovery")
+        self.recovery = RecoveryManager(state_dir)
+        
+        # Track processed files to avoid duplicates
+        self.processed_files: Set[str] = set()
+        
+    @with_retry(max_retries=3, initial_delay=1.0)
+    async def _add_to_vector_store(
+        self,
+        texts: List[str],
+        metadata_list: List[Dict[str, Any]]
+    ) -> List[str]:
+        """
+        Add documents to vector store with retry logic.
+        
+        Args:
+            texts: List of text chunks
+            metadata_list: List of metadata dictionaries
+            
+        Returns:
+            List of document IDs
+        """
+        return await self.vector_store.add_documents(
+            texts=texts,
+            metadata_list=metadata_list,
+            batch_size=self.batch_size
+        )
         
     async def process_pdf(self, pdf_path: Path) -> bool:
         """
-        Process a single PDF file.
+        Process a single PDF file with error recovery.
         
         Args:
             pdf_path: Path to PDF file
@@ -58,6 +105,17 @@ class PipelineOrchestrator:
         Returns:
             bool: True if processing was successful
         """
+        pdf_str = str(pdf_path)
+        if pdf_str in self.processed_files:
+            logger.info(f"Skipping already processed file: {pdf_path}")
+            return True
+            
+        # Start tracking operation
+        recovery_state = self.recovery.start_operation(
+            "process_pdf",
+            {"pdf_path": pdf_str}
+        )
+        
         try:
             # Get chunks from the document
             chunks = self.chunk_pipeline.process_file(pdf_path)
@@ -67,14 +125,13 @@ class PipelineOrchestrator:
                 
             # Prepare batch data
             texts = [chunk.text for chunk in chunks]
-            metadata = [chunk.metadata for chunk in chunks]
+            metadata = [
+                {**chunk.metadata, "source_file": pdf_str}
+                for chunk in chunks
+            ]
             
-            # Add to vector store with batching
-            doc_ids = await self.vector_store.add_documents(
-                texts=texts,
-                metadata_list=metadata,
-                batch_size=self.batch_size
-            )
+            # Add to vector store with retries
+            doc_ids = await self._add_to_vector_store(texts, metadata)
             
             # Update stats
             self.stats.successful_files += 1
@@ -82,43 +139,67 @@ class PipelineOrchestrator:
             # Estimate tokens (rough approximation)
             self.stats.total_tokens += sum(len(text.split()) * 1.3 for text in texts)
             
+            # Mark as processed
+            self.processed_files.add(pdf_str)
+            
+            # Update recovery state
+            self.recovery.update_operation(
+                recovery_state.operation_id,
+                "completed"
+            )
+            
             logger.info(f"Successfully processed {pdf_path} - {len(chunks)} chunks")
             return True
             
         except Exception as e:
             logger.error(f"Failed to process {pdf_path}: {str(e)}")
             self.stats.failed_files += 1
-            self.stats.errors[str(pdf_path)] = str(e)
+            self.stats.errors[pdf_str] = str(e)
+            
+            # Update recovery state
+            self.recovery.update_operation(
+                recovery_state.operation_id,
+                "failed",
+                str(e)
+            )
+            
             return False
             
     async def process_directory(self, 
                               dir_path: Path,
                               recursive: bool = True) -> ProcessingStats:
         """
-        Process all PDFs in a directory.
+        Process all PDFs in a directory with automatic recovery.
         
         Args:
             dir_path: Directory containing PDFs
             recursive: Whether to process subdirectories
             
         Returns:
-            ProcessingStats with processing results
+            Processing statistics
         """
         start_time = time.time()
-        
-        # Reset stats
-        self.stats = ProcessingStats(0, 0, 0, 0, 0, 0.0, {})
-        
-        # Find all PDFs
         pattern = "**/*.pdf" if recursive else "*.pdf"
-        pdf_paths = list(dir_path.glob(pattern))
-        self.stats.total_files = len(pdf_paths)
         
-        # Process files
-        for pdf_path in pdf_paths:
+        # Check for incomplete operations from previous runs
+        incomplete = self.recovery.list_incomplete_operations()
+        if incomplete:
+            logger.info(f"Found {len(incomplete)} incomplete operations")
+            for op_id, state in incomplete.items():
+                if state.operation_type == "process_pdf":
+                    pdf_path = Path(state.input_data["pdf_path"])
+                    if pdf_path.exists():
+                        logger.info(f"Retrying incomplete operation: {pdf_path}")
+                        if await self.process_pdf(pdf_path):
+                            self.stats.retry_successes += 1
+        
+        # Process new files
+        pdf_files = list(dir_path.glob(pattern))
+        self.stats.total_files = len(pdf_files)
+        
+        for pdf_path in pdf_files:
             await self.process_pdf(pdf_path)
             
-        # Update final stats
         self.stats.processing_time = time.time() - start_time
         
         # Log summary
@@ -127,6 +208,9 @@ class PipelineOrchestrator:
             f"({self.stats.total_chunks} chunks) in {self.stats.processing_time:.1f}s"
         )
         
+        if self.stats.retry_successes:
+            logger.info(f"Successfully recovered {self.stats.retry_successes} files")
+            
         if self.stats.failed_files:
             logger.warning(f"Failed to process {self.stats.failed_files} files")
             
