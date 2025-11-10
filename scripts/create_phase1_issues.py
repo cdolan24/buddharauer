@@ -55,49 +55,109 @@ def create_issue(token: str, title: str, body: str) -> dict:
 # Define Phase 1 priority issues
 ISSUES = [
     {
-        "title": "Implement PDF Text Extraction Module",
+        "title": "Implement Chunking Integration Pipeline",
         "body": """**Phase**: 1 - Document Processing Pipeline
 **Priority**: High
-**Component**: PDF Text Extraction
+**Component**: Chunking Integration
 
 **Description**:
-Implement the PDF text extraction module using PyMuPDF to handle document processing.
+Implement the chunking integration pipeline to connect PDF extraction with semantic chunking.
 
 **Tasks**:
-- [ ] Create `src/pipeline/pdf_extractor.py`
-- [ ] Implement text extraction with PyMuPDF
-- [ ] Add metadata extraction (pages, title, etc.)
-- [ ] Implement progress tracking for large PDFs
-- [ ] Add error handling and logging
-- [ ] Write unit tests
+- [ ] Create ChunkingPipeline class
+- [ ] Implement semantic chunk size optimization
+- [ ] Add metadata preservation logic
+- [ ] Add progress tracking integration
+- [ ] Write integration tests with PDF extractor
 
 **Technical Details**:
-- Use PyMuPDF for text extraction
-- Handle different PDF formats
-- Extract metadata including title, pages, chapters
-- Implement progress tracking for large files
+- Build on top of existing PDF extractor improvements
+- Ensure metadata is preserved through the pipeline
+- Add configurable chunk size optimization
+- Implement progress tracking
+- Add comprehensive tests
 
-**Testing**:
-- [ ] Test with various PDF types
-- [ ] Verify metadata extraction
-- [ ] Test progress tracking
-- [ ] Test error handling
-"""
+**Definition of Done**:
+1. ChunkingPipeline class implemented and tested
+2. Integration tests with PDF extractor passing
+3. Chunk size optimization working
+4. Metadata preservation verified
+5. Progress tracking functional
+
+**Dependencies**:
+- PDF Extractor module
+- Current test coverage maintained"""
     },
     {
-        "title": "Implement Semantic Chunking Module",
+        "title": "Implement Pipeline Orchestration System",
         "body": """**Phase**: 1 - Document Processing Pipeline
 **Priority**: High
-**Component**: Semantic Chunking
+**Component**: Pipeline Orchestration
 
 **Description**:
-Create the semantic chunking module to intelligently split extracted text.
+Create the main pipeline orchestration system to manage the document processing workflow.
 
 **Tasks**:
-- [ ] Create `src/pipeline/chunker.py`
-- [ ] Implement semantic chunking using LangChain
-- [ ] Add configurable chunk size/overlap settings
-- [ ] Implement metadata enrichment
+- [ ] Create DocumentPipeline class
+- [ ] Implement pipeline state management
+- [ ] Add progress tracking aggregation
+- [ ] Add error recovery for partial failures
+- [ ] Add state persistence and resumption
+- [ ] Write end-to-end tests
+
+**Technical Details**:
+- Create main pipeline coordinator
+- Implement state management
+- Add progress tracking across components
+- Add error recovery mechanisms
+- Implement state persistence
+- Add comprehensive testing
+
+**Definition of Done**:
+1. DocumentPipeline class implemented
+2. State management working
+3. Progress tracking functional
+4. Error recovery tested
+5. End-to-end tests passing
+
+**Dependencies**:
+- All pipeline components
+- State persistence system"""
+    },
+    {
+        "title": "Implement Vector Store Integration",
+        "body": """**Phase**: 1 - Document Processing Pipeline
+**Priority**: Medium
+**Component**: Vector Store Integration
+
+**Description**:
+Implement vector store integration with chunking output and optimize for performance.
+
+**Tasks**:
+- [ ] Create VectorStorePipeline class
+- [ ] Implement optimized bulk insertion
+- [ ] Add metadata filtering system
+- [ ] Add chunk deduplication
+- [ ] Write integration tests
+
+**Technical Details**:
+- Integrate with ChromaDB
+- Optimize bulk operations
+- Implement metadata system
+- Add deduplication logic
+- Add comprehensive tests
+
+**Definition of Done**:
+1. VectorStorePipeline implemented
+2. Bulk operations optimized
+3. Metadata filtering working
+4. Deduplication tested
+5. Integration tests passing
+
+**Dependencies**:
+- Chunking pipeline
+- ChromaDB setup"""
+    }
 - [ ] Handle special cases (tables, lists)
 - [ ] Write unit tests
 
