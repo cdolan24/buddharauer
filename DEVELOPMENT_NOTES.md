@@ -115,35 +115,47 @@ except SpecificError as e:
    - Added document storage and search
    - ChromaDB-compatible API for future migration
 
-### 7. Next Steps
+### 7. Next Development Tasks (Updated Nov 10, 2025)
 
-1. Test Coverage Improvements (High Priority):
-   - Focus on vector_store.py untested sections:
-     - Document class methods
-     - cosine_similarity function
-     - _load_documents method
-     - Error handling edge cases
-   - Add integration tests between PDF pipeline components
-   - Test error recovery scenarios
-   - Add boundary condition tests for chunking
+1. Vector Store Test Coverage (High Priority):
+   Target: 90% coverage (currently 24%)
+   
+   Key Areas:
+   - Document class implementation
+   - Vector operations (cosine_similarity)
+   - File operations (_load_documents)
+   - Error handling & edge cases
+   - Metadata filtering system
 
 2. Performance Optimization:
-   - Profile vector similarity search
-   - Evaluate chunking strategy effectiveness
-   - Consider batch processing improvements
-   - Measure performance with larger datasets
+   Focus: Vector search and document processing
+   
+   Areas:
+   - Search algorithm efficiency
+   - Memory usage optimization
+   - Batch processing improvements
+   - Resource monitoring
+   - Memory-mapped files
 
-3. Documentation Updates:
-   - Update API documentation
-   - Add code examples for common use cases
-   - Document test patterns and fixtures
-   - Add performance testing guide
+3. ChromaDB Migration Planning:
+   Status: Planned for Q4
+   
+   Tasks:
+   - Document current API surface
+   - Test ChromaDB compatibility
+   - Create migration scripts
+   - Build wrapper class
+   - Design rollback procedures
 
-4. System Architecture:
-   - Consider implementing document caching
-   - Optimize similarity search for scale
-   - Review error handling consistency
-   - Add logging level configuration
+4. Documentation & Testing:
+   Priority: High
+   
+   Updates:
+   - API documentation
+   - Migration guides
+   - Performance benchmarks
+   - Test patterns
+   - Code examples
 
 ### 7. Code Patterns
 
