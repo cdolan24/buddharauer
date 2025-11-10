@@ -56,6 +56,7 @@ cover/
 # FastAgent
 .fast-agent/
 fast-agent.log
+fastagent.config.yaml  # User-specific config (keep fastagent.config.example.yaml)
 
 # Environment variables
 .env
@@ -80,9 +81,16 @@ data/**/*.pdf
 # Processed outputs
 processed/
 vector_db/
+
+# System databases and storage
+data_storage/
 *.db
 *.sqlite
 *.sqlite3
+
+# Session files
+.sessions/
+*.session
 
 # Logs
 *.log

@@ -2,255 +2,397 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## Project Overview - ARCHITECTURE V2 (HYBRID APPROACH!)
 
-**Buddharauer** is an AI-powered PDF analysis system built with FastAgent (fast-agent-mcp) that enables semantic search, entity extraction, and intelligent querying of document collections. The system processes PDFs to extract structured information (characters, locations, items) and provides a conversational interface for exploration.
+**Buddharauer** is a local-first AI-powered PDF analysis system with a **chat-based web interface**. Built with **FastAgent + FastAPI + Ollama**, it combines the power of FastAgent's MCP-native agent framework with local LLMs, exposing agents via REST API for web frontend access.
 
-**Primary User**: Faraday - needs to understand document contents without information overload through Q&A, summarization, and categorization.
+**⚠️ IMPORTANT**: The architecture uses a **hybrid approach**: FastAgent agents (orchestration) + FastAPI (REST layer) + Ollama (local models) + Gradio (web UI). See `specs/ARCHITECTURE_V2.md` for complete details.
 
-## Technology Stack
+## Technology Stack V2
 
-- **Language**: Python 3.13.5+
-- **Framework**: FastAgent (fast-agent-mcp v0.3.17+) - MCP-native AI agent framework
-- **Package Manager**: uv (modern Python package management)
-- **Vector Database**: ChromaDB (MVP) → Qdrant (production)
-- **LLM Provider**: Anthropic Claude (primary), with OpenAI/Google support
-- **PDF Processing**: PyMuPDF (fitz) or pdfplumber
-- **Testing**: pytest, pytest-asyncio
+- **Agent Framework**: FastAgent (fast-agent-mcp v0.3.17+)
+- **Backend**: FastAPI (REST API wrapping FastAgent agents)
+- **Frontend**: Gradio (web chat interface with document viewer)
+- **LLM Server**: Ollama (local models: llama3.2, qwen2.5, mistral, phi)
+- **Agent Integration**: FastAgent generic provider → Ollama OpenAI-compatible API
+- **Vector Database**: ChromaDB (MVP) or Qdrant (production)
+- **PDF Processing**: PyMuPDF (fitz), Pillow
+- **Python**: 3.13.5+ (required for FastAgent)
+- **Package Manager**: uv (preferred) or pip
+- **Testing**: pytest, pytest-asyncio, httpx
 
-## Project Structure
+## Key Features
+
+### Chat-Based Interface (NEW!)
+- **Split Screen UI**: Chat window + Source document viewer side-by-side
+- **Live Citations**: Highlighted passages with page references
+- **Multi-Turn Conversations**: Context-aware dialogue
+
+### Local-First Architecture (NEW!)
+- **No Cloud Dependencies**: All models run via Ollama
+- **Privacy**: Documents never leave your machine
+- **Configurable Models**: Choose models per agent based on hardware
+
+### Multi-Agent System (FastAgent)
+- **Orchestrator Agent**: Main FastAgent agent, routes questions, manages conversation (generic.llama3.2:latest)
+- **Analyst Agent**: FastAgent sub-agent, summarizes and provides insights (generic.llama3.2:latest or qwen2.5)
+- **Web Search Agent**: FastAgent sub-agent, external search via MCP tools (generic.mistral:7b)
+- **Retrieval Agent**: FastAgent sub-agent, RAG system for vector search (generic.qwen2.5:latest + nomic-embed-text embeddings)
+
+## Project Structure V2
 
 ```
 buddharauer/
-├── data/                    # Raw PDF files (gitignored)
-├── processed/              # Processing outputs (gitignored)
-│   ├── text/              # Extracted text files
-│   ├── markdown/          # Converted markdown
-│   └── metadata/          # Document metadata (JSON)
+├── config.yaml              # Main configuration (NEW!)
+├── requirements.txt         # Python dependencies
+├── run.py                   # Application launcher (NEW!)
+│
+├── data/                    # Raw PDFs
+├── processed/               # Processed outputs
+│   ├── text/
+│   ├── markdown/
+│   ├── metadata/
+│   └── images/
+├── vector_db/              # ChromaDB/Qdrant
+├── data_storage/           # SQLite databases
+│
 ├── src/
-│   ├── agents/            # FastAgent agent definitions
-│   │   ├── qa_agent.py           # Question answering
-│   │   ├── summarization_agent.py # Content summarization
-│   │   ├── categorization_agent.py # Entity filtering
-│   │   └── extraction_agent.py    # Entity extraction
-│   ├── pipeline/          # Data processing pipeline
+│   ├── api/               # FastAPI backend (NEW!)
+│   │   ├── main.py       # API entry point
+│   │   └── routes/       # /chat, /documents, /search, /health
+│   │
+│   ├── agents/           # LangChain agents (NEW!)
+│   │   ├── orchestrator.py
+│   │   ├── analyst.py
+│   │   ├── web_search.py
+│   │   └── retrieval.py
+│   │
+│   ├── pipeline/         # Document processing
 │   │   ├── pdf_extractor.py
-│   │   ├── text_processor.py
-│   │   ├── markdown_converter.py
-│   │   └── embeddings_generator.py
-│   ├── database/          # Vector DB interface
+│   │   ├── chunker.py         # Semantic chunking (NEW!)
+│   │   ├── embeddings.py
+│   │   └── image_processor.py
+│   │
+│   ├── database/
 │   │   ├── vector_store.py
-│   │   └── query_manager.py
-│   ├── models/            # Data models
-│   │   ├── document.py
-│   │   ├── entity.py
-│   │   └── query.py
-│   ├── client/            # User interface
-│   │   └── cli.py
-│   └── utils/             # Utilities
-│       ├── config.py
-│       └── logging.py
-├── specs/                 # Detailed specifications (READ THESE!)
-├── tests/                 # Test suite
-└── .env                   # Config (gitignored, use .env.example)
+│   │   ├── document_registry.py
+│   │   └── query_logger.py
+│   │
+│   ├── frontend/         # Gradio UI (NEW!)
+│   │   ├── app.py
+│   │   └── components/
+│   │
+│   └── utils/
+│       ├── config.py          # YAML config loader
+│       ├── ollama_client.py   # Ollama API wrapper
+│       └── chunking.py
+│
+├── tests/
+│   ├── unit/
+│   ├── integration/      # API tests, agent tests
+│   └── e2e/             # Full chat flow tests
+│
+├── scripts/
+│   ├── process_documents.py
+│   └── setup_models.py
+│
+└── specs/               # Documentation
+    ├── ARCHITECTURE_V2.md      # **READ THIS FIRST!**
+    ├── IMPLEMENTATION_PLAN.md  # Development roadmap
+    └── API.md                  # REST API reference
 ```
 
-## Development Commands
+## Configuration Files
 
-### Environment Setup
+### fastagent.config.yaml (FastAgent LLM Provider)
+
+```yaml
+# FastAgent generic provider for Ollama
+generic:
+  api_key: "ollama"
+  base_url: "http://localhost:11434/v1"  # Ollama OpenAI-compatible endpoint
+```
+
+### config.yaml (Application Configuration)
+
+```yaml
+# FastAgent + Ollama setup
+fastagent:
+  provider: "generic"
+  ollama_base_url: "http://localhost:11434"
+  models_path: "/custom/path"  # Optional
+
+# Agent model selections (FastAgent model specs)
+agents:
+  orchestrator:
+    model: "generic.llama3.2:latest"
+    temperature: 0.7
+  analyst:
+    model: "generic.llama3.2:latest"
+    temperature: 0.5
+  web_search:
+    model: "generic.mistral:7b"
+    temperature: 0.3
+  retrieval:
+    llm_model: "generic.qwen2.5:latest"
+    embedding_model: "nomic-embed-text"
+
+vector_db:
+  type: "chromadb"
+  path: "./vector_db"
+
+chunking:
+  strategy: "semantic"
+  chunk_size: 800
+  chunk_overlap: 150
+```
+
+## Recommended LLM Models (FastAgent + Ollama)
+
+| Agent | FastAgent Model Spec | Ollama Model | RAM | GPU | FastAgent Tested |
+|-------|---------------------|--------------|-----|-----|------------------|
+| Orchestrator | `generic.llama3.2:latest` | llama3.2 | 8GB | Optional | ✅ Yes |
+| Orchestrator (alt) | `generic.qwen2.5:latest` | qwen2.5 | 7GB | Optional | ✅ Yes |
+| Analyst | `generic.llama3.2:latest` | llama3.2 | 8GB | Optional | ✅ Yes |
+| Web Search | `generic.mistral:7b` | mistral:7b | 6GB | Optional | ⚠️ Limited |
+| Retrieval (LLM) | `generic.qwen2.5:latest` | qwen2.5 | 7GB | Optional | ✅ Yes |
+| Embeddings | N/A (Ollama API) | nomic-embed-text | 2GB | - | N/A |
+
+**Note**: FastAgent has officially tested tool calling and structured generation with `llama3.2:latest` and `qwen2.5:latest`. Other models may work but are not guaranteed.
+
+**Alternatives**:
+- Low memory: `phi3:mini` (4GB), `mistral:7b` (6GB)
+- High quality: `llama3:70b` (40GB), `qwen2:72b` (40GB)
+
+## Quick Start Commands
+
 ```bash
-# Install uv package manager first
-# Then install dependencies
-uv pip install fast-agent-mcp chromadb pymupdf pytest
+# Install Ollama
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Pull models for FastAgent
+ollama pull llama3.2:latest
+ollama pull qwen2.5:latest
+ollama pull mistral:7b
+ollama pull nomic-embed-text
+
+# Install dependencies (requires Python 3.13.5+)
+uv pip install -r requirements.txt
+# Or: pip install -r requirements.txt
 
 # Setup FastAgent
-fast-agent setup
+fast-agent setup  # Creates fastagent.config.yaml
 
-# Create environment file
-cp .env.example .env
-# Edit .env with API keys
+# Configure Ollama in fastagent.config.yaml:
+# generic:
+#   api_key: "ollama"
+#   base_url: "http://localhost:11434/v1"
+
+# Test FastAgent + Ollama
+fast-agent --model generic.llama3.2:latest
+
+# Process documents
+python scripts/process_documents.py
+
+# Start backend (FastAPI + FastAgent)
+uvicorn src.api.main:app --reload --port 8000
+
+# Start frontend (Gradio)
+python src/frontend/app.py
+
+# Or use launcher
+python run.py
 ```
 
-### Running the Application
+## REST API Endpoints
+
+### Chat
+- `POST /api/chat` - Send message, get response with sources
+- `GET /api/conversations/{id}` - Get chat history
+- `DELETE /api/conversations/{id}` - Clear conversation
+
+### Documents
+- `GET /api/documents` - List all documents
+- `GET /api/documents/{id}` - Get document details
+- `GET /api/documents/{id}/content` - Get markdown/text
+- `POST /api/documents/upload` - Upload new PDF
+
+### Search
+- `POST /api/search` - Vector search across documents
+
+### Health
+- `GET /api/health` - System status, Ollama connectivity
+
+## Development Workflow
+
+### 1. Setup Environment
 ```bash
-# Interactive FastAgent session
-fast-agent go
-
-# Process new PDFs (to be implemented)
-python -m src.pipeline.process_documents
-
-# Run with watch mode for auto-processing
-python -m src.pipeline.process_documents --watch
+# Install Ollama and pull models
+# Create venv and install dependencies
+# Copy config.example.yaml to config.yaml
 ```
 
-### Testing
+### 2. Process Documents
+```bash
+# Add PDFs to data/
+python scripts/process_documents.py
+```
+
+### 3. Start Development
+```bash
+# Terminal 1: Backend
+uvicorn src.api.main:app --reload
+
+# Terminal 2: Frontend
+python src/frontend/app.py
+
+# Access: http://localhost:7860
+```
+
+### 4. Testing
 ```bash
 # Run all tests
 pytest
 
-# Run with coverage
+# Run specific category
+pytest tests/unit/
+pytest tests/integration/
+pytest tests/e2e/
+
+# With coverage
 pytest --cov=src --cov-report=html
-
-# Run specific test file
-pytest tests/test_pdf_extractor.py
-
-# Run tests matching pattern
-pytest -k "test_entity"
 ```
 
-### Code Quality
-```bash
-# Lint with ruff
-ruff check src/
+## Large PDF Handling
 
-# Format with black
-black src/
-
-# Type checking
-mypy src/
-```
-
-## Architecture Highlights
-
-### Data Flow
-1. **Ingestion**: PDF → Text Extraction → Text Cleanup → Markdown Conversion
-2. **Embedding**: Chunking (500-1000 tokens, 100-200 overlap) → Embeddings → Vector DB
-3. **Querying**: User Query → Vector Search → Context Retrieval → Agent Processing → Response
-
-### Agent Design Pattern
-- **QA Agent**: RAG-based question answering with citations
-- **Summarization Agent**: Template-based entity summaries
-- **Categorization Agent**: Natural language query parsing + filtering
-- **Extraction Agent**: NER + schema validation for entities
-
-### Entity Schema
+### Chunking Strategy
 ```python
-# Character
-{"id": "char_001", "name": str, "type": "character",
- "attributes": {"gender": str, "role": str, "species": str},
- "locations": [str], "mentions": int}
+# Semantic chunking with LangChain
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-# Location
-{"id": "loc_001", "name": str, "type": "location",
- "attributes": {"region": str, "type": str},
- "characters": [str], "mentions": int}
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=800,          # Configurable in config.yaml
+    chunk_overlap=150,
+    separators=["\n\n", "\n", ". ", " ", ""],
+)
 ```
 
-## Configuration
-
-Key parameters in `src/utils/config.py`:
-- `CHUNK_SIZE`: 800 tokens (adjustable 500-1000)
-- `CHUNK_OVERLAP`: 150 tokens (adjustable 100-200)
-- `EMBEDDING_MODEL`: "text-embedding-3-small" (OpenAI)
-- `VECTOR_DB`: "chromadb" (or "qdrant")
-- `LLM_PROVIDER`: "anthropic" (Claude)
-
-Environment variables (`.env`):
-- `ANTHROPIC_API_KEY`: Required for Claude
-- `OPENAI_API_KEY`: Required for embeddings
-- `VECTOR_DB_PATH`: "./vector_db"
+### Chunk Metadata
+```python
+{
+    "chunk_id": "doc_001_chunk_042",
+    "document_id": "doc_001",
+    "page_start": 42,
+    "page_end": 43,
+    "chapter": "Book 1, Chapter 3",
+    "text": "...",
+    "embedding": [0.1, 0.2, ...]
+}
+```
 
 ## Important Implementation Notes
 
-### FastAgent Usage
-- Use declarative syntax for agent definitions
-- Leverage MCP features (Sampling, Elicitations)
-- Follow "Building Effective Agents" patterns from Anthropic
-- Support for structured outputs, PDF, and vision built-in
+### FastAgent + Ollama Integration
+- **FastAgent Layer**: All agents defined using FastAgent framework (fast-agent-mcp)
+- **Ollama Connection**: FastAgent uses generic provider pointing to Ollama's OpenAI-compatible API (localhost:11434/v1)
+- **Configuration**: Set via `fastagent.config.yaml` and environment variables
+- **Model Specification**: Use `generic.model_name:tag` format (e.g., `generic.llama3.2:latest`)
+- **Tool Calling**: Use FastAgent's MCP tools for sub-agents and vector DB access
+- **Testing**: Verify tool calling works with `llama3.2:latest` or `qwen2.5:latest` (officially tested)
 
-### PDF Processing
-- Handle corrupted PDFs gracefully (log, skip, notify)
-- Preserve page references for citations
-- Support incremental processing (watch mode)
-- Implement retry logic for API failures
+### FastAPI Integration
+- **Wrapper Layer**: FastAPI endpoints call FastAgent agents programmatically
+- **Agent Initialization**: Initialize FastAgent orchestrator on app startup
+- **Async Calls**: Use async/await for agent calls from FastAPI endpoints
+- **Response Formatting**: Extract sources and metadata from agent responses
+- **Error Handling**: Catch FastAgent exceptions and return appropriate HTTP errors
+
+### Agent Design (FastAgent)
+- **Orchestrator**: Main FastAgent agent with sub-agent tools
+- **Sub-agents**: Defined as FastAgent tools or workflows
+- **Routing**: Orchestrator uses MCP tool calling to invoke sub-agents
+- **Memory**: Conversation context managed by FastAgent
+- **RAG**: Custom MCP tool for ChromaDB vector search
 
 ### Vector Database
-- Use cosine similarity for search
-- Batch upserts (100 chunks at a time)
-- Cache embeddings to avoid regeneration
-- Maintain document registry for tracking
+- Use ChromaDB for MVP (easy setup)
+- Qdrant for production (better performance)
+- Batch upsert for large documents
+- Include rich metadata in chunks
 
-### Entity Extraction
-- Implement deduplication logic
-- Validate against schemas
-- Build relationship graph
-- Store in JSON or SQLite
+### Frontend (Gradio)
+- Split screen: chat on left, document viewer on right
+- Citations clickable → scroll document viewer
+- Chat history maintained per conversation
+- Document selector dropdown
 
-### Performance Targets
-- PDF processing: <30 seconds per document
-- Query response: <3 seconds
-- Entity extraction: <1 minute per document
-- Test coverage: >80% (MVP), >90% (production)
-
-## Development Phases
-
-**Current Status**: Planning phase complete, ready for Phase 0 (Project Setup)
-
-See [specs/implementation-phases.md](specs/implementation-phases.md) for full roadmap:
-- Phase 0: Project setup (Week 1)
-- Phase 1: PDF processing pipeline (Week 2-3)
-- Phase 2: Vector DB integration (Week 3-4)
-- Phase 3: FastAgent basic QA (Week 4-5)
-- Phase 4: Entity extraction (Week 5-6)
-- Phase 5: Summarization (Week 6-7)
-- Phase 6: Categorization (Week 7-8)
-- Phase 7-10: CLI, management, testing, documentation
-
-## Key User Stories
-
-1. **Question Answering**: "Who is Aragorn?" → Answer with citations (page numbers)
-2. **Summarization**: "Summarize all characters" → Grouped list with details
-3. **Categorization**: "Show all male characters in Bree" → Filtered results
-4. **Entity Detail**: "Detail Aragorn" → Full profile with relationships
-5. **Document Management**: Add/remove PDFs dynamically with auto-processing
-
-## Testing Strategy
-
-- **Unit Tests**: Each pipeline stage, agent, database operation
-- **Integration Tests**: Full workflows (PDF → Query → Response)
-- **Performance Tests**: Large document sets, concurrent queries
-- **Quality Tests**: Embedding quality, entity extraction accuracy
-- Target: >80% coverage for MVP, >90% for production
-
-## Security & Best Practices
-
-- Never commit API keys (use .env)
-- Validate user inputs in query processing
-- Implement rate limiting for API calls
-- Audit log for document access
-- Input sanitization for file operations
+### Testing Critical Services
+- **Chunking**: Test with various PDF sizes
+- **Embeddings**: Verify Ollama connectivity
+- **Agents**: Mock Ollama responses
+- **API**: Test all endpoints with httpx
+- **E2E**: Full chat flow with test documents
 
 ## Common Gotchas
 
-1. **FastAgent requires Python 3.13.5+**: Ensure correct version
-2. **API costs**: Embedding generation costs add up, implement caching
-3. **Chunking strategy**: Too small = loss of context, too large = poor retrieval
-4. **Entity deduplication**: Same entities with different spellings need normalization
-5. **PDF quality**: Image-only PDFs need OCR (future enhancement)
+1. **Ollama must be running**: Check with `ollama list`
+2. **Model not pulled**: Run `ollama pull <model>`
+3. **Large PDFs**: May need >16GB RAM for processing
+4. **Gradio CORS**: Configure in FastAPI for localhost:7860
+5. **Chunking large docs**: Use progress bars, handle timeouts
+
+## Current Status
+
+**Architecture**: V2 (Ollama + FastAPI + Gradio)
+**Phase**: 0 (Planning Complete, Ready for Implementation)
+**Next**: Environment setup → Document processing pipeline → Backend API → Agents → Frontend
+
+## Key Documentation
+
+**MUST READ**:
+- `specs/ARCHITECTURE_V2.md` - Complete V2 architecture details
+- `specs/IMPLEMENTATION_PLAN.md` - 6-week development plan with GitHub issues
+- `README.md` - User-facing documentation
+
+**Reference**:
+- `specs/user-stories-detailed.md` - User requirements (Faraday & Albert)
+- `specs/API.md` - REST API specification (to be created)
+
+## Architecture Changes from V1
+
+| Aspect | V1 | V2 |
+|--------|----|----|
+| **Framework** | FastAgent (CLI) | FastAgent + FastAPI (Hybrid) |
+| **Models** | Cloud (Claude/GPT) | Local (Ollama) |
+| **Interface** | CLI | Web (Gradio) |
+| **UX** | Terminal Q&A | Chat + Document Viewer |
+| **Agents** | 5 FastAgent agents (CLI) | 4 FastAgent agents (via FastAPI) |
+| **Model Access** | Cloud APIs | Ollama via FastAgent generic provider |
+| **Config** | .env | fastagent.config.yaml + config.yaml + .env |
+
+## Session Handoff Checklist
+
+At end of each session:
+- [ ] Update GitHub issues with progress
+- [ ] Update IMPLEMENTATION_PLAN.md
+- [ ] Run tests and note any failures
+- [ ] Update this CLAUDE.md if architecture changes
+- [ ] Document blockers or decisions needed
+- [ ] List next session priorities
 
 ## Resources
 
-- **FastAgent Docs**: https://fast-agent.ai/
-- **FastAgent GitHub**: https://github.com/evalstate/fast-agent
-- **Detailed Specs**: See [specs/](specs/) directory
-- **Architecture**: [specs/architecture.md](specs/architecture.md)
-- **Pipeline**: [specs/data-processing-pipeline.md](specs/data-processing-pipeline.md)
-- **User Stories**: [specs/user-stories-detailed.md](specs/user-stories-detailed.md)
+- **Ollama Docs**: https://github.com/ollama/ollama
+- **LangChain Docs**: https://python.langchain.com/
+- **FastAPI Docs**: https://fastapi.tiangolo.com/
+- **Gradio Docs**: https://gradio.app/
+- **ChromaDB Docs**: https://docs.trychroma.com/
 
-## Git Workflow
+---
 
-- Main branch: `main`
-- Commit message format: Conventional Commits preferred
-- Branch naming: `feature/`, `fix/`, `docs/`
-- Always run tests before committing
+**Note**: This project uses **local models only** via Ollama. No cloud API keys required (except optional web search).
 
-## Notes for Future Sessions
-
-When implementing, prioritize in this order:
-1. Setup development environment (Phase 0)
-2. Get basic PDF → Text → Markdown working (Phase 1)
-3. Get one PDF searchable in vector DB (Phase 2)
-4. Get basic Q&A working with one document (Phase 3)
-5. Expand to entity extraction and other features
-
-Focus on getting end-to-end pipeline working with ONE PDF before scaling to multiple documents.
+*Last updated: 2025-11-09*
+*Architecture: V2 (FastAgent + FastAPI + Ollama Hybrid)*
+*Status: Planning Complete, Ready for Phase 0 Implementation*
+*Key Change: FastAgent framework retained, integrated with FastAPI and Ollama local models*

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(move fastagent.config.yaml fastagent.config.example.yaml)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,0 +1,52 @@
+# FastAgent Configuration for Buddharauer
+# This file configures FastAgent's LLM provider to use local Ollama models
+
+# Generic OpenAI/Ollama Provider Configuration
+# This provider uses Ollama's OpenAI-compatible API endpoint
+generic:
+  api_key: "ollama"  # Default API key for Ollama (not validated)
+  base_url: "http://localhost:11434/v1"  # Ollama's OpenAI-compatible endpoint
+
+# Environment Variable Overrides (optional)
+# You can override these settings using environment variables:
+# - GENERIC_API_KEY: Override the API key
+# - GENERIC_BASE_URL: Override the base URL (useful for remote Ollama instances)
+
+# Example: Remote Ollama instance
+# generic:
+#   api_key: "ollama"
+#   base_url: "http://192.168.1.100:11434/v1"
+
+# Usage with FastAgent CLI
+# To use a specific model with FastAgent, use the following format:
+#   fast-agent --model generic.llama3.2:latest
+#   fast-agent --model generic.qwen2.5:latest
+#   fast-agent --model generic.mistral:7b
+
+# Tested Models for Tool Calling
+# FastAgent has officially tested these models for tool calling and structured generation:
+# - generic.llama3.2:latest (✅ Recommended for orchestrator and analyst)
+# - generic.qwen2.5:latest (✅ Recommended for retrieval and analysis)
+#
+# Other models may work but are not officially tested:
+# - generic.mistral:7b (⚠️ Limited testing for web search)
+# - generic.phi3:mini (⚠️ Limited testing for lightweight tasks)
+
+# Notes:
+# 1. Make sure Ollama is running before using FastAgent: `ollama serve`
+# 2. Pull required models first: `ollama pull llama3.2:latest`
+# 3. Test connectivity: `fast-agent --model generic.llama3.2:latest`
+# 4. For programmatic use in FastAPI, set environment variables or use this config
+
+# Integration with FastAPI
+# In your FastAPI application (src/api/main.py):
+#   import os
+#   os.environ["GENERIC_API_KEY"] = "ollama"
+#   os.environ["GENERIC_BASE_URL"] = "http://localhost:11434/v1"
+#
+#   from fastagent import Agent
+#   orchestrator = Agent(
+#       name="orchestrator",
+#       model="generic.llama3.2:latest",
+#       system_prompt="You are a helpful document Q&A assistant..."
+#   )
