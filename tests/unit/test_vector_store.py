@@ -7,6 +7,9 @@ These tests verify:
 3. Metadata filtering
 4. Collection management
 5. Vector similarity search
+6. Retry behavior
+7. Error cases
+8. Data persistence
 
 The tests use a temporary directory for storage to avoid affecting
 the main vector store data.
@@ -114,6 +117,92 @@ async def test_search_with_filters(vector_store: VectorStore):
     assert len(results["ids"][0]) == 2
     for metadata in results["metadatas"][0]:
         assert metadata["source"] == "source1"
+@pytest.mark.asyncio
+async def test_add_documents_with_retry(vector_store: VectorStore):
+    """Test adding documents with retry functionality."""
+    texts = ["Document 1", "Document 2"]
+    metadata_list = [{"source": "test1"}, {"source": "test2"}]
+
+    # Try with empty lists - should raise ValueError
+    with pytest.raises(ValueError):
+        await vector_store.add_documents_with_retry([], [])
+
+    # Try with mismatched lengths - should raise ValueError
+    with pytest.raises(ValueError):
+        await vector_store.add_documents_with_retry(
+            texts=["single doc"], 
+            metadata_list=[{"source": "1"}, {"source": "2"}]
+        )
+
+    # Normal case should succeed
+    ids = await vector_store.add_documents_with_retry(
+        texts=texts,
+        metadata_list=metadata_list
+    )
+    assert len(ids) == 2
+    assert vector_store.get_collection_stats()["total_documents"] == 2
+
+
+@pytest.mark.asyncio
+async def test_search_error_cases(vector_store: VectorStore):
+    """Test error cases for search functionality."""
+    # Empty query list should return empty results
+    results = await vector_store.search(query_texts=[])
+    assert not results["ids"]
+    assert not results["documents"]
+    assert not results["metadatas"]
+    assert not results["distances"]
+
+    # Search with no documents should return empty results
+    results = await vector_store.search(
+        query_texts=["test query"],
+        where={"nonexistent": "filter"}
+    )
+    assert not results["ids"]
+
+    # Add some documents and test filtering
+    await vector_store.add_documents(
+        texts=["Document 1", "Document 2"],
+        metadata_list=[
+            {"source": "src1"},
+            {"source": "src2"}
+        ]
+    )
+
+    # Search with filter that matches no documents
+    results = await vector_store.search(
+        query_texts=["document"],
+        where={"source": "nonexistent"}
+    )
+    assert len(results["ids"]) == 1
+    assert not results["ids"][0]  # Empty list for this query
+
+
+@pytest.mark.asyncio
+async def test_persistence(vector_store: VectorStore):
+    """Test document persistence between store instances."""
+    # Add documents
+    await vector_store.add_documents(
+        texts=["Test document"],
+        metadata_list=[{"source": "test"}]
+    )
+
+    # Create new instance with same directory
+    new_store = VectorStore(
+        persist_directory=vector_store.persist_directory
+    )
+
+    # Should have same documents
+    assert new_store.get_collection_stats()["total_documents"] == 1
+
+    # Search should work in new instance
+    results = await new_store.search(
+        query_texts=["test"],
+        n_results=1
+    )
+    assert len(results["ids"][0]) == 1
+
+
 def test_delete_collection(vector_store: VectorStore):
     """Test deleting the collection."""
     vector_store.delete_collection()
