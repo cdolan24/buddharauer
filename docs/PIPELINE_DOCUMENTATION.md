@@ -36,11 +36,48 @@ class TextChunk:
 - Tracks processing statistics
 - Provides progress information
 
-### 2. Vector Store (`src/database/vector_store.py`)
+### 2. Error Recovery System (`src/pipeline/recovery.py`)
+
+#### Components
+
+**`RecoveryManager`**
+- Manages operation state persistence
+- Tracks active operations
+- Handles recovery of incomplete operations
+- Provides automatic cleanup
+
+**`RecoveryState`**
+```python
+@dataclass
+class RecoveryState:
+    operation_id: str       # Unique operation identifier
+    start_time: float      # Operation start timestamp
+    operation_type: str    # Type of operation
+    input_data: dict       # Operation parameters
+    status: str           # Current status
+    error: Optional[str]  # Error message if failed
+    retry_count: int      # Number of retry attempts
+```
+
+**Retry Mechanism**
+```python
+@with_retry(max_retries=3, initial_delay=1.0)
+async def operation():
+    """Operation will be retried with exponential backoff."""
+```
+
+#### Features
+- State persistence and recovery
+- Exponential backoff retries
+- Operation tracking
+- Duplicate prevention
+- Error reporting and monitoring
+
+### 3. Vector Store (`src/database/vector_store.py`)
 
 #### Features
 - Batched document processing
-- Async operations
+- Async operations with retry support
 - Metadata filtering
 - Persistence support
 - ChromaDB-compatible interface
