@@ -1,4 +1,33 @@
+[project]
+name = "buddharauer"
+version = "0.1.0"
+description = "Local-first RAG application with Ollama, FastAPI, and Gradio"
+authors = [
+    {name = "cdolan24", email = "cdolan24@github.com"}
+]
+readme = "README.md"
+requires-python = ">=3.13.5"
+dependencies = [
+    "fast-agent-mcp>=0.3.17",
+    "fastapi",
+    "uvicorn",
+    "gradio",
+    "chromadb",
+    "pymupdf",
+    "pillow",
+    "python-dotenv",
+    "pyyaml",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "httpx"
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v"
+addopts = "-v --cov=src"

@@ -1,22 +1,32 @@
-# Development Notes - Document Processing Pipeline
+# Development Notes
 
-## Phase 1 Progress Notes - November 9, 2025
+> **Note**: Main implementation tracking has moved to `IMPLEMENTATION_PROGRESS.md`.
+> This file contains development patterns, guidelines, and technical decisions.
 
-### 1. Completed Components
+## Development Patterns
 
-#### PDF Text Extraction
-- Implemented in `src/pipeline/pdf_extractor.py`
-- Using PyMuPDF (fitz) for extraction
-- Handles both single files and directories
-- Core method: `extract_text()`
-- Added batch processing with progress tracking
+### 1. Code Structure
 
-#### Semantic Chunking
-- Implemented in `src/pipeline/chunker.py`
-- Configurable chunk size and overlap
-- Preserves document structure
-- TextChunk data class for metadata
-- Handles both paragraphs and sections
+#### Module Organization
+- Business logic in `src/pipeline/`
+- Data access in `src/database/`
+- Utilities in `src/utils/`
+- Tests mirror source structure
+
+#### Testing Strategy
+- Unit tests for all components
+- Integration tests for workflows
+- Coverage target: >80%
+- Test data in `tests/data/`
+
+#### Error Handling Pattern
+```python
+try:
+    result = operation()
+except SpecificError as e:
+    logger.error(f"Operation failed: {e}")
+    raise OperationError(f"Friendly message: {e}") from e
+```
 
 #### Embedding Generation
 - Implemented in `src/pipeline/embeddings.py`
