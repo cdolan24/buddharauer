@@ -6,12 +6,21 @@ All PDFs should be located within the data directory of the project.
 Use src.utils.paths.get_data_dir() to get the correct path.
 """
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple, Callable
 import fitz  # PyMuPDF
 from dataclasses import dataclass
 from datetime import datetime
+import time
+from functools import wraps
 
 from src.utils.paths import get_data_dir, list_pdf_files
+from src.utils.logging import get_logger
+from .pdf_errors import (
+    PDFExtractionError, PDFCorruptedError, PDFEncryptedError,
+    PDFInvalidFormatError, PDFExtractionTimeout
+)
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -36,17 +45,43 @@ class PDFPage:
     is_scanned: bool
 
 
+def retry_on_error(max_retries: int = 3, delay: float = 1.0):
+    """Decorator for retrying operations on temporary failures."""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_error = None
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except PDFExtractionError as e:
+                    last_error = e
+                    logger.warning(f"Attempt {attempt + 1}/{max_retries} failed: {str(e)}")
+                    if attempt < max_retries - 1:
+                        time.sleep(delay * (attempt + 1))  # Exponential backoff
+                    continue
+            raise last_error
+        return wrapper
+    return decorator
+
 class PDFExtractor:
     """Handles extraction of text and metadata from PDF files."""
     
-    def __init__(self, progress_callback=None):
+    def __init__(self, 
+                progress_callback: Optional[Callable[[int, int], None]] = None,
+                max_retries: int = 3,
+                timeout: float = 30.0):
         """
         Initialize the PDF extractor.
         
         Args:
             progress_callback: Optional callback function(current, total) for progress tracking
+            max_retries: Maximum number of retries for failed extractions
+            timeout: Timeout in seconds for PDF operations
         """
         self.progress_callback = progress_callback
+        self.max_retries = max_retries
+        self.timeout = timeout
 
     def extract_metadata(self, pdf_doc: fitz.Document) -> PDFMetadata:
         """
@@ -72,6 +107,7 @@ class PDFExtractor:
             page_count=pdf_doc.page_count
         )
 
+    @retry_on_error()
     def extract_text(self, pdf_path: Path) -> tuple[List[PDFPage], PDFMetadata]:
         """
         Extract text and metadata from a PDF file.
@@ -84,18 +120,39 @@ class PDFExtractor:
             
         Raises:
             FileNotFoundError: If PDF file doesn't exist
-            ValueError: If file is not a valid PDF
+            PDFCorruptedError: If the PDF file is corrupted
+            PDFEncryptedError: If the PDF file is encrypted
+            PDFInvalidFormatError: If file is not a valid PDF
+            PDFExtractionTimeout: If extraction exceeds timeout
         """
         if not pdf_path.exists():
             raise FileNotFoundError(f"PDF file not found: {pdf_path}")
 
+        start_time = time.time()
         try:
             pdf_doc = fitz.open(pdf_path)
+            
+            # Check if PDF is encrypted
+            if pdf_doc.needs_pass:
+                raise PDFEncryptedError(f"PDF is encrypted: {pdf_path}")
+                
+            # Check if PDF is valid
+            if not pdf_doc.is_pdf:
+                raise PDFInvalidFormatError(f"Not a valid PDF: {pdf_path}")
+                
+            metadata = self.extract_metadata(pdf_doc)
+            pages = []
+            
+            logger.info(f"Starting extraction of {pdf_path} ({metadata.page_count} pages)")
+            
+        except fitz.FileDataError as e:
+            raise PDFCorruptedError(f"PDF file is corrupted: {e}")
         except Exception as e:
-            raise ValueError(f"Failed to open PDF file: {e}")
-
-        metadata = self.extract_metadata(pdf_doc)
-        pages = []
+            raise PDFExtractionError(f"Failed to open PDF file: {e}")
+            
+        # Track overall extraction time
+        if time.time() - start_time > self.timeout:
+            raise PDFExtractionTimeout(f"PDF extraction timed out after {self.timeout}s")
 
         for page_num in range(pdf_doc.page_count):
             if self.progress_callback:
@@ -118,7 +175,7 @@ class PDFExtractor:
 
     def process_directory(self, 
                          subdir: Optional[str] = None, 
-                         skip_existing: bool = True) -> Dict[Path, List[PDFPage]]:
+                         skip_existing: bool = True) -> Dict[Path, tuple[List[PDFPage], PDFMetadata]]:
         """
         Process all PDFs in the data directory or a subdirectory.
         
@@ -127,21 +184,37 @@ class PDFExtractor:
             skip_existing: Skip PDFs that have already been processed
             
         Returns:
-            Dictionary mapping PDF paths to their extracted pages
+            Dictionary mapping PDF paths to tuples of (pages, metadata)
         """
         pdf_files = list_pdf_files(subdir)
         results = {}
+        errors = []
         
-        for pdf_path in pdf_files:
+        logger.info(f"Processing {len(pdf_files)} PDF files from {subdir or 'root'}")
+        
+        for i, pdf_path in enumerate(pdf_files, 1):
             try:
-                pages, _ = self.extract_text(pdf_path)
-                results[pdf_path] = pages
-                if self.progress_callback:
-                    self.progress_callback(len(results), len(pdf_files))
-            except Exception as e:
-                print(f"Error processing {pdf_path}: {e}")
-                continue
+                pages, metadata = self.extract_text(pdf_path)
+                results[pdf_path] = (pages, metadata)
                 
+                if self.progress_callback:
+                    self.progress_callback(i, len(pdf_files))
+                    
+                logger.info(f"Successfully processed {pdf_path} ({metadata.page_count} pages)")
+                
+            except PDFExtractionError as e:
+                logger.error(f"Error processing {pdf_path}: {str(e)}")
+                errors.append((pdf_path, str(e)))
+            except Exception as e:
+                logger.exception(f"Unexpected error processing {pdf_path}")
+                errors.append((pdf_path, str(e)))
+        
+        if errors:
+            logger.warning(f"Failed to process {len(errors)} files:")
+            for path, error in errors:
+                logger.warning(f"- {path}: {error}")
+                
+        logger.info(f"Successfully processed {len(results)}/{len(pdf_files)} PDF files")
         return results
 
     def _parse_pdf_date(self, date_str: Optional[str]) -> Optional[datetime]:

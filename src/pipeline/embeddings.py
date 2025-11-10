@@ -1,39 +1,106 @@
 """Embeddings generation module using Ollama's nomic-embed-text model."""
-from typing import List
+from typing import List, Dict, Optional, Callable
 import httpx
 import asyncio
 from pathlib import Path
-import json
-import hashlib
+import time
+from src.utils.logging import get_logger
+from .embeddings_cache import EmbeddingsCache
+
+logger = get_logger(__name__)
+
+
+class EmbeddingError(Exception):
+    """Base class for embedding generation errors."""
+    pass
+
+
+class EmbeddingAPIError(EmbeddingError):
+    """Error from the Ollama API."""
+    pass
+
+
+class EmbeddingTimeoutError(EmbeddingError):
+    """Timeout during embedding generation."""
+    pass
 
 
 class EmbeddingGenerator:
     """Generate embeddings using Ollama's nomic-embed-text model."""
 
-    def __init__(self, cache_dir: str | Path = "data/cache/embeddings"):
+    def __init__(self, 
+                cache_dir: str | Path = "data/cache/embeddings",
+                batch_size: int = 50,
+                max_retries: int = 3,
+                timeout: float = 30.0,
+                progress_callback: Optional[Callable[[int, int], None]] = None):
         """Initialize the embedding generator.
         
         Args:
             cache_dir: Directory to store embedding cache files
+            batch_size: Number of texts to process in parallel
+            max_retries: Maximum number of retries for failed API calls
+            timeout: Timeout in seconds for each API call
+            progress_callback: Optional callback for tracking progress
         """
         self.base_url = "http://localhost:11434/api/embeddings"
         self.model = "nomic-embed-text"
-        self.cache_dir = Path(cache_dir)
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.batch_size = batch_size
+        self.max_retries = max_retries
+        self.timeout = timeout
+        self.progress_callback = progress_callback
+        self.cache = EmbeddingsCache(cache_dir)
         
-    def _get_cache_path(self, text: str) -> Path:
-        """Get cache file path for text content.
+    async def _generate_single(self, 
+                           text: str, 
+                           retry_count: int = 0) -> List[float]:
+        """Generate embedding for a single text with retries.
         
         Args:
-            text: Text content to generate cache path for
+            text: Text to generate embedding for
+            retry_count: Current retry attempt number
             
         Returns:
-            Path to cache file
+            List of floating point values representing the embedding
+            
+        Raises:
+            EmbeddingAPIError: If API call fails after all retries
+            EmbeddingTimeoutError: If API call times out
         """
-        # Use hash of text as filename to avoid filesystem issues
-        text_hash = hashlib.sha256(text.encode()).hexdigest()
-        return self.cache_dir / f"{text_hash}.json"
-
+        start_time = time.time()
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    self.base_url,
+                    json={"model": self.model, "prompt": text},
+                    timeout=self.timeout
+                )
+                response.raise_for_status()
+                result = response.json()
+                
+                if "embedding" not in result:
+                    raise EmbeddingAPIError(f"No embedding in response: {result}")
+                    
+                return result["embedding"]
+                
+        except httpx.TimeoutError:
+            if retry_count < self.max_retries:
+                await asyncio.sleep(2 ** retry_count)  # Exponential backoff
+                return await self._generate_single(text, retry_count + 1)
+            raise EmbeddingTimeoutError(f"Timeout after {self.timeout}s")
+            
+        except httpx.HTTPError as e:
+            if retry_count < self.max_retries:
+                await asyncio.sleep(2 ** retry_count)
+                return await self._generate_single(text, retry_count + 1)
+            raise EmbeddingAPIError(f"API error: {str(e)}")
+            
+        finally:
+            elapsed = time.time() - start_time
+            if elapsed > self.timeout / 2:  # Log slow requests
+                logger.warning(f"Slow embedding generation ({elapsed:.1f}s): {text[:100]}...")
+    
     async def generate_embedding(self, text: str) -> List[float]:
         """Generate embedding for a single text.
         
@@ -42,51 +109,89 @@ class EmbeddingGenerator:
             
         Returns:
             List of floating point values representing the embedding
+            
+        Raises:
+            EmbeddingError: If embedding generation fails
         """
-        # Check cache first
-        cache_path = self._get_cache_path(text)
-        if cache_path.exists():
-            with cache_path.open() as f:
-                return json.load(f)["embedding"]
-        
+        # Try cache first
+        if cached := await self.cache.get(text):
+            return cached
+            
         # Generate new embedding
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                self.base_url,
-                json={"model": self.model, "prompt": text}
-            )
-            response.raise_for_status()
-            result = response.json()
-            if "embedding" not in result:
-                raise ValueError(f"No embedding generated for text: {text}")
-            embedding = result["embedding"]
-            
-            # Cache the result
-            cache_path.write_text(json.dumps({
-                "text": text,
-                "embedding": embedding
-            }))
-            
-            return embedding
-    
-    async def batch_generate_embeddings(self, texts: List[str]) -> List[List[float]]:
+        embedding = await self._generate_single(text)
+        await self.cache.put(text, embedding)
+        return embedding
+
+    async def batch_generate_embeddings(self, 
+                                      texts: List[str], 
+                                      ignore_errors: bool = False) -> Dict[str, List[float]]:
         """Generate embeddings for multiple texts in parallel.
         
         Args:
             texts: List of texts to generate embeddings for
+            ignore_errors: If True, failed embeddings will be skipped
             
         Returns:
-            List of embeddings (each embedding is a list of floats)
-        """
-        # Process in batches to avoid overloading the API
-        batch_size = 100
-        embeddings = []
+            Dictionary mapping texts to their embeddings
         
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
-            batch_embeddings = await asyncio.gather(*[
-                self.generate_embedding(text) for text in batch
-            ])
-            embeddings.extend(batch_embeddings)
+        Raises:
+            EmbeddingError: If any embedding fails and ignore_errors is False
+        """
+        if not texts:
+            return {}
             
-        return embeddings
+        logger.info(f"Generating embeddings for {len(texts)} texts")
+        start_time = time.time()
+        results = {}
+        errors = []
+        
+        # Get cached embeddings first
+        cached = await self.cache.get_batch(texts)
+        results.update(cached)
+        
+        # Generate embeddings for uncached texts
+        uncached = [t for t in texts if t not in cached]
+        if not uncached:
+            return results
+            
+        logger.info(f"Found {len(cached)} cached embeddings, generating {len(uncached)} new")
+        processed = len(cached)
+        
+        # Process in batches
+        for i in range(0, len(uncached), self.batch_size):
+            batch = uncached[i:i + self.batch_size]
+            
+            # Generate embeddings in parallel
+            tasks = [self._generate_single(text) for text in batch]
+            batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Process results
+            for text, result in zip(batch, batch_results):
+                if isinstance(result, Exception):
+                    if ignore_errors:
+                        errors.append((text, str(result)))
+                        continue
+                    raise result
+                results[text] = result
+                
+            processed += len(batch)
+            if self.progress_callback:
+                self.progress_callback(processed, len(texts))
+                
+        # Cache new embeddings
+        await self.cache.put_batch({t: e for t, e in results.items() if t in uncached})
+        
+        elapsed = time.time() - start_time
+        logger.info(
+            f"Generated {len(results)} embeddings in {elapsed:.1f}s "
+            f"({len(errors)} errors, {len(cached)} from cache)"
+        )
+        
+        if errors:
+            logger.warning("Failed to generate some embeddings:")
+            for text, error in errors[:5]:
+                logger.warning(f"- {text[:100]}...: {error}")
+            if len(errors) > 5:
+                logger.warning(f"  ...and {len(errors)-5} more errors")
+                
+        return results

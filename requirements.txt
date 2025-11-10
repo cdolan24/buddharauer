@@ -18,3 +18,9 @@ pytest>=7.4.3
 pytest-asyncio>=0.21.1
 pytest-cov>=4.1.0
 httpx>=0.25.1
+
+# Pipeline components
+aiofiles>=23.2.1  # Async file operations
+tenacity>=8.2.3   # Retry logic
+python-ulid>=1.1.0  # Unique IDs
+tqdm>=4.66.1  # Progress bars
