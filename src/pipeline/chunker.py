@@ -3,7 +3,13 @@ Text chunking module that handles semantic chunking of document content.
 Uses the LangChain inspired approach to split text into semantically meaningful chunks.
 """
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
+from pathlib import Path
+
+from .pdf_extractor import PDFExtractor, PDFPage, PDFMetadata
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -89,10 +95,70 @@ class SemanticChunker:
             
         return chunks
 
+    def process_pdf(self, 
+                   pdf_path: Path,
+                   optimize_chunks: bool = True,
+                   target_chunks_per_page: int = 5) -> List[TextChunk]:
+        """
+        Process a PDF file and create semantic chunks.
+        
+        Args:
+            pdf_path: Path to PDF file
+            optimize_chunks: Whether to optimize chunk size based on content
+            target_chunks_per_page: Target number of chunks per page when optimizing
+            
+        Returns:
+            List of TextChunk objects with metadata
+        """
+        logger.info(f"Processing PDF: {pdf_path}")
+        
+        # Extract text and metadata from PDF
+        extractor = PDFExtractor()
+        metadata = extractor.extract_metadata(pdf_path)
+        pages = extractor.extract_pages(pdf_path)
+        
+        # Optimize chunk size if requested
+        if optimize_chunks:
+            # Sample first few pages for optimization
+            sample_text = "\n\n".join(page.text for page in pages[:3])
+            optimal_size = get_optimal_chunk_size(
+                sample_text,
+                target_chunks=target_chunks_per_page * len(pages[:3])
+            )
+            logger.info(f"Optimized chunk size: {optimal_size}")
+            self.chunk_size = optimal_size
+        
+        # Process each page
+        all_chunks = []
+        
+        for page in pages:
+            # Create base metadata
+            page_metadata = {
+                'source': str(pdf_path),
+                'page': page.number,
+                'total_pages': metadata.page_count,
+                'is_scanned': page.is_scanned,
+                'title': metadata.title,
+                'author': metadata.author,
+                'creation_date': metadata.creation_date.isoformat() if metadata.creation_date else None,
+            }
+            
+            # Create chunks for this page
+            page_chunks = self.create_chunks(
+                text=page.text,
+                page_number=page.number,
+                metadata=page_metadata
+            )
+            
+            all_chunks.extend(page_chunks)
+            
+        logger.info(f"Created {len(all_chunks)} chunks from {metadata.page_count} pages")
+        return all_chunks
+
     def create_chunks(self, 
                      text: str,
                      page_number: int,
-                     metadata: Optional[dict] = None) -> List[TextChunk]:
+                     metadata: Optional[Dict[str, Any]] = None) -> List[TextChunk]:
         """
         Create semantic chunks from text with metadata.
         
@@ -151,3 +217,56 @@ def get_optimal_chunk_size(text: str,
     chunk_size = max(min_size, min(chunk_size, max_size))
     
     return chunk_size
+
+
+class ChunkPipeline:
+    """Pipeline for processing PDFs into semantic chunks."""
+    
+    def __init__(self,
+                 chunker: SemanticChunker,
+                 optimize_chunks: bool = True,
+                 target_chunks_per_page: int = 5):
+        """
+        Initialize the pipeline.
+        
+        Args:
+            chunker: SemanticChunker instance
+            optimize_chunks: Whether to optimize chunk size based on content
+            target_chunks_per_page: Target number of chunks per page when optimizing
+        """
+        self.chunker = chunker
+        self.optimize_chunks = optimize_chunks
+        self.target_chunks_per_page = target_chunks_per_page
+        self.total_processed = 0
+        self.total_chunks = 0
+        
+    def process_file(self, pdf_path: Path) -> List[TextChunk]:
+        """Process a single PDF file."""
+        chunks = self.chunker.process_pdf(
+            pdf_path,
+            optimize_chunks=self.optimize_chunks,
+            target_chunks_per_page=self.target_chunks_per_page
+        )
+        self.total_processed += 1
+        self.total_chunks += len(chunks)
+        return chunks
+        
+    def process_directory(self, dir_path: Path) -> Dict[str, List[TextChunk]]:
+        """Process all PDFs in a directory."""
+        results = {}
+        for pdf_path in dir_path.glob('**/*.pdf'):
+            try:
+                chunks = self.process_file(pdf_path)
+                results[str(pdf_path)] = chunks
+            except Exception as e:
+                logger.error(f"Failed to process {pdf_path}: {str(e)}")
+                continue
+        return results
+        
+    def get_stats(self) -> Dict[str, int]:
+        """Get processing statistics."""
+        return {
+            'files_processed': self.total_processed,
+            'total_chunks': self.total_chunks,
+            'avg_chunks_per_file': self.total_chunks // max(1, self.total_processed)
+        }

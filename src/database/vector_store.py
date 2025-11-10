@@ -97,7 +97,67 @@ class VectorStore:
     async def add_documents(self, 
                           texts: List[str],
                           metadata_list: List[Dict[str, Any]],
-                          ids: Optional[List[str]] = None) -> List[str]:
+                          ids: Optional[List[str]] = None,
+                          batch_size: int = 32) -> List[str]:
+        """
+        Add multiple documents to the store with batched processing.
+        
+        Args:
+            texts: List of text strings
+            metadata_list: List of metadata dictionaries
+            ids: Optional list of IDs (generated if not provided)
+            batch_size: Number of documents to process at once
+            
+        Returns:
+            List of document IDs
+        """
+        if not texts or not metadata_list:
+            return []
+            
+        if len(texts) != len(metadata_list):
+            raise ValueError("texts and metadata_list must have same length")
+            
+        if ids and len(ids) != len(texts):
+            raise ValueError("if provided, ids must have same length as texts")
+            
+        doc_ids = []
+        
+        # Process in batches
+        for i in range(0, len(texts), batch_size):
+            batch_texts = texts[i:i + batch_size]
+            batch_metadata = metadata_list[i:i + batch_size]
+            batch_ids = ids[i:i + batch_size] if ids else None
+            
+            # Generate embeddings for batch
+            batch_embeddings = await self.embedding_generator.batch_generate(batch_texts)
+            
+            # Generate IDs if needed
+            if not batch_ids:
+                batch_ids = [
+                    hashlib.sha256(text.encode()).hexdigest()
+                    for text in batch_texts
+                ]
+                
+            # Create documents
+            new_docs = []
+            for text, embedding, metadata, doc_id in zip(
+                batch_texts, batch_embeddings, batch_metadata, batch_ids):
+                doc = Document(
+                    text=text,
+                    embedding=embedding,
+                    metadata=metadata,
+                    id=doc_id
+                )
+                new_docs.append(doc)
+                doc_ids.append(doc_id)
+                
+            # Update documents list
+            self.documents.extend(new_docs)
+            
+            # Save after each batch
+            self._save_documents()
+            
+        return doc_ids
         """
         Add documents to the vector store.
         
