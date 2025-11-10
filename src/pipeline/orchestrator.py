@@ -13,6 +13,7 @@ from src.pipeline.chunker import ChunkPipeline, TextChunk
 from src.database.vector_store import VectorStore
 from src.utils.logging import get_logger
 from src.pipeline.recovery import RecoveryManager, with_retry
+from src.pipeline.monitoring import monitor, Metric, MetricType
 
 logger = get_logger(__name__)
 
@@ -41,6 +42,26 @@ class ProcessingStats:
             'errors': self.errors,
             'retry_successes': self.retry_successes
         }
+        
+    def update_metrics(self) -> None:
+        """Update monitoring metrics with current stats."""
+        metrics = [
+            Metric("pipeline_total_files", self.total_files, MetricType.GAUGE),
+            Metric("pipeline_successful_files", self.successful_files, MetricType.COUNTER),
+            Metric("pipeline_failed_files", self.failed_files, MetricType.COUNTER),
+            Metric("pipeline_total_chunks", self.total_chunks, MetricType.COUNTER),
+            Metric("pipeline_total_tokens", self.total_tokens, MetricType.COUNTER),
+            Metric("pipeline_processing_time", self.processing_time, MetricType.GAUGE),
+            Metric("pipeline_retry_successes", self.retry_successes, MetricType.COUNTER),
+            Metric(
+                "pipeline_success_rate",
+                self.successful_files / max(self.total_files, 1),
+                MetricType.GAUGE
+            )
+        ]
+        
+        for metric in metrics:
+            monitor.record_metric(metric)
 
 
 class PipelineOrchestrator:
@@ -116,12 +137,25 @@ class PipelineOrchestrator:
             {"pdf_path": pdf_str}
         )
         
+        # Start monitoring
+        start_time = time.time()
+        labels = {"file": pdf_str}
+        
         try:
             # Get chunks from the document
-            chunks = self.chunk_pipeline.process_file(pdf_path)
+            with monitor.track_operation_time("chunk_extraction", labels):
+                chunks = self.chunk_pipeline.process_file(pdf_path)
             
             if not chunks:
                 raise ValueError("No chunks extracted from document")
+                
+            # Record chunking metrics
+            monitor.record_metric(Metric(
+                "pdf_chunk_count",
+                len(chunks),
+                MetricType.HISTOGRAM,
+                labels=labels
+            ))
                 
             # Prepare batch data
             texts = [chunk.text for chunk in chunks]
@@ -131,13 +165,23 @@ class PipelineOrchestrator:
             ]
             
             # Add to vector store with retries
-            doc_ids = await self._add_to_vector_store(texts, metadata)
+            with monitor.track_operation_time("vector_store_insert", labels):
+                doc_ids = await self._add_to_vector_store(texts, metadata)
             
             # Update stats
             self.stats.successful_files += 1
             self.stats.total_chunks += len(chunks)
             # Estimate tokens (rough approximation)
-            self.stats.total_tokens += sum(len(text.split()) * 1.3 for text in texts)
+            token_count = sum(len(text.split()) * 1.3 for text in texts)
+            self.stats.total_tokens += token_count
+            
+            # Record token metrics
+            monitor.record_metric(Metric(
+                "pdf_token_count",
+                token_count,
+                MetricType.HISTOGRAM,
+                labels=labels
+            ))
             
             # Mark as processed
             self.processed_files.add(pdf_str)
@@ -148,13 +192,45 @@ class PipelineOrchestrator:
                 "completed"
             )
             
-            logger.info(f"Successfully processed {pdf_path} - {len(chunks)} chunks")
+            # Record processing time
+            processing_time = time.time() - start_time
+            monitor.record_metric(Metric(
+                "pdf_processing_time",
+                processing_time,
+                MetricType.HISTOGRAM,
+                labels=labels
+            ))
+            
+            # Update overall stats metrics
+            self.stats.update_metrics()
+            
+            logger.info(
+                f"Successfully processed {pdf_path} - "
+                f"{len(chunks)} chunks, {int(token_count)} tokens, "
+                f"{processing_time:.2f}s"
+            )
             return True
             
         except Exception as e:
+            error_time = time.time() - start_time
             logger.error(f"Failed to process {pdf_path}: {str(e)}")
             self.stats.failed_files += 1
             self.stats.errors[pdf_str] = str(e)
+            
+            # Record error metrics
+            monitor.record_metric(Metric(
+                "pdf_processing_errors",
+                1,
+                MetricType.COUNTER,
+                labels={**labels, "error": str(e)}
+            ))
+            
+            monitor.record_metric(Metric(
+                "pdf_error_processing_time",
+                error_time,
+                MetricType.HISTOGRAM,
+                labels=labels
+            ))
             
             # Update recovery state
             self.recovery.update_operation(
@@ -162,6 +238,9 @@ class PipelineOrchestrator:
                 "failed",
                 str(e)
             )
+            
+            # Update overall stats metrics
+            self.stats.update_metrics()
             
             return False
             
@@ -180,10 +259,26 @@ class PipelineOrchestrator:
         """
         start_time = time.time()
         pattern = "**/*.pdf" if recursive else "*.pdf"
+        labels = {"directory": str(dir_path), "recursive": str(recursive)}
+        
+        # Record start of processing
+        monitor.record_metric(Metric(
+            "directory_processing_start",
+            time.time(),
+            MetricType.GAUGE,
+            labels=labels
+        ))
         
         # Check for incomplete operations from previous runs
         incomplete = self.recovery.list_incomplete_operations()
         if incomplete:
+            monitor.record_metric(Metric(
+                "incomplete_operations",
+                len(incomplete),
+                MetricType.GAUGE,
+                labels=labels
+            ))
+            
             logger.info(f"Found {len(incomplete)} incomplete operations")
             for op_id, state in incomplete.items():
                 if state.operation_type == "process_pdf":
@@ -197,10 +292,55 @@ class PipelineOrchestrator:
         pdf_files = list(dir_path.glob(pattern))
         self.stats.total_files = len(pdf_files)
         
-        for pdf_path in pdf_files:
-            await self.process_pdf(pdf_path)
+        # Initialize progress tracking
+        monitor.update_progress(
+            operation="process_directory",
+            completed=0,
+            total=len(pdf_files),
+            current_item=str(dir_path),
+            error_count=0
+        )
+        
+        # Record directory metrics
+        monitor.record_metric(Metric(
+            "directory_pdf_count",
+            len(pdf_files),
+            MetricType.GAUGE,
+            labels=labels
+        ))
+        
+        # Process files with progress tracking
+        for i, pdf_path in enumerate(pdf_files, 1):
+            success = await self.process_pdf(pdf_path)
+            monitor.update_progress(
+                operation="process_directory",
+                completed=i,
+                total=len(pdf_files),
+                current_item=str(pdf_path),
+                error_count=self.stats.failed_files
+            )
             
-        self.stats.processing_time = time.time() - start_time
+        processing_time = time.time() - start_time
+        self.stats.processing_time = processing_time
+        
+        # Record completion metrics
+        monitor.record_metric(Metric(
+            "directory_processing_time",
+            processing_time,
+            MetricType.HISTOGRAM,
+            labels=labels
+        ))
+        
+        monitor.record_metric(Metric(
+            "directory_processing_complete",
+            time.time(),
+            MetricType.GAUGE,
+            labels={
+                **labels,
+                "success_rate": f"{self.stats.successful_files/self.stats.total_files:.2%}",
+                "duration": f"{processing_time:.1f}s"
+            }
+        ))
         
         # Log summary
         logger.info(
@@ -213,7 +353,9 @@ class PipelineOrchestrator:
             
         if self.stats.failed_files:
             logger.warning(f"Failed to process {self.stats.failed_files} files")
-            
+        
+        # Update final stats metrics
+        self.stats.update_metrics()
         return self.stats
         
     def get_stats(self) -> ProcessingStats:
