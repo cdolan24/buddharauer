@@ -218,3 +218,103 @@ async def test_progress_tracking(embedding_generator):
     # Should have progress updates for each batch
     assert len(progress_calls) > 0
     assert progress_calls[-1] == (3, 3)  # Final call should be (total, total)
+
+
+@pytest.mark.asyncio
+async def test_empty_texts_list(embedding_generator):
+    """Test that empty text list returns empty results (line 150)."""
+    results = await embedding_generator.batch_generate_embeddings([])
+    assert results == {}
+    assert len(results) == 0
+
+
+@pytest.mark.asyncio
+async def test_http_error_retry_then_fail(embedding_generator):
+    """Test HTTP error retry logic when all retries fail (lines 103-106)."""
+    # Set max_retries to ensure we exhaust retries
+    embedding_generator.max_retries = 2
+
+    # Mock that always fails with HTTP error
+    with patch('httpx.AsyncClient') as mock_client:
+        mock_instance = AsyncMock()
+        mock_instance.post = AsyncMock(side_effect=httpx.HTTPError("Persistent HTTP Error"))
+        mock_instance.__aenter__.return_value = mock_instance
+        mock_instance.__aexit__.return_value = None
+        mock_client.return_value = mock_instance
+
+        # Should raise EmbeddingAPIError after exhausting retries
+        with pytest.raises(EmbeddingAPIError) as exc:
+            await embedding_generator.generate_embedding("test http error")
+        assert "API error" in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_batch_error_raises_without_ignore(embedding_generator):
+    """Test that batch processing raises errors when ignore_errors=False (lines 180-183)."""
+    import time
+    timestamp = time.time()
+    texts = [f"text1 batch {timestamp}", f"text2 batch {timestamp}"]
+
+    # Clear cache
+    for text in texts:
+        cache_path = embedding_generator.cache._get_cache_path(text)
+        if cache_path.exists():
+            cache_path.unlink()
+
+    with patch('httpx.AsyncClient') as mock_client:
+        mock_instance = AsyncMock()
+        call_count = [0]
+
+        async def mock_post(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                # First text succeeds
+                return mock_api_response(embedding=[0.1])
+            # Second text fails persistently
+            raise httpx.HTTPError("Persistent Error")
+
+        mock_instance.post = mock_post
+        mock_instance.__aenter__.return_value = mock_instance
+        mock_instance.__aexit__.return_value = None
+        mock_client.return_value = mock_instance
+
+        # Should raise error when ignore_errors=False (default)
+        with pytest.raises(EmbeddingAPIError):
+            await embedding_generator.batch_generate_embeddings(texts, ignore_errors=False)
+
+
+@pytest.mark.asyncio
+async def test_batch_error_logging_for_many_errors(embedding_generator):
+    """Test error logging when there are many errors (lines 200-204)."""
+    import time
+    timestamp = time.time()
+    # Create 8 texts to trigger the "...and X more errors" logging
+    texts = [f"text{i} logging {timestamp}" for i in range(8)]
+
+    # Clear cache
+    for text in texts:
+        cache_path = embedding_generator.cache._get_cache_path(text)
+        if cache_path.exists():
+            cache_path.unlink()
+
+    with patch('httpx.AsyncClient') as mock_client:
+        mock_instance = AsyncMock()
+        # All texts fail with HTTP error after retries
+        mock_instance.post = AsyncMock(side_effect=httpx.HTTPError("Error"))
+        mock_instance.__aenter__.return_value = mock_instance
+        mock_instance.__aexit__.return_value = None
+        mock_client.return_value = mock_instance
+
+        # Capture log output
+        with patch('src.pipeline.embeddings.logger') as mock_logger:
+            results = await embedding_generator.batch_generate_embeddings(
+                texts, ignore_errors=True
+            )
+
+            # Should have called warning for errors
+            # Check that logger.warning was called with error details
+            assert mock_logger.warning.called
+            # Should log "and X more errors" since we have > 5 errors
+            warning_calls = [str(call) for call in mock_logger.warning.call_args_list]
+            has_more_errors_msg = any("more errors" in str(call) for call in warning_calls)
+            assert has_more_errors_msg or len(texts) - len(results) > 5

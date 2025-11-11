@@ -213,3 +213,74 @@ def test_delete_collection(vector_store: VectorStore):
         persist_directory=vector_store.persist_directory
     )
     assert new_store.get_collection_stats()["total_documents"] == 0
+
+
+def test_cosine_similarity_with_lists():
+    """Test cosine similarity function with list inputs (lines 70-73)."""
+    from src.database.vector_store import cosine_similarity
+
+    # Test with list inputs (triggers lines 70-73)
+    vec1 = [1.0, 2.0, 3.0]
+    vec2 = [2.0, 4.0, 6.0]
+
+    similarity = cosine_similarity(vec1, vec2)
+    assert abs(similarity - 1.0) < 0.001  # Vectors in same direction
+
+    # Test with orthogonal vectors
+    vec3 = [1.0, 0.0, 0.0]
+    vec4 = [0.0, 1.0, 0.0]
+    similarity = cosine_similarity(vec3, vec4)
+    assert abs(similarity - 0.0) < 0.001  # Orthogonal vectors
+
+
+@pytest.mark.asyncio
+async def test_add_documents_invalid_ids_length(vector_store: VectorStore):
+    """Test validation of ids length mismatch (line 152)."""
+    texts = ["Text one", "Text two"]
+    metadata_list = [{"source": "test1"}, {"source": "test2"}]
+
+    # Invalid: ids length doesn't match texts length
+    with pytest.raises(ValueError, match="ids must have same length"):
+        await vector_store.add_documents(
+            texts=texts,
+            metadata_list=metadata_list,
+            ids=["id1"]  # Only 1 id for 2 texts
+        )
+
+
+@pytest.mark.asyncio
+async def test_delete_collection_with_existing_data(vector_store: VectorStore):
+    """Test delete_collection when collection file exists (line 357)."""
+    # Add documents to create collection file
+    await vector_store.add_documents(
+        texts=["Test document"],
+        metadata_list=[{"source": "test"}]
+    )
+
+    # Verify collection file exists
+    assert vector_store.collection_path.exists()
+
+    # Delete collection (should remove file)
+    vector_store.delete_collection()
+
+    # Verify file is gone and in-memory data cleared
+    assert not vector_store.collection_path.exists()
+    assert len(vector_store.documents) == 0
+    assert vector_store.get_collection_stats()["total_documents"] == 0
+
+
+@pytest.mark.asyncio
+async def test_add_documents_with_retry_error_logging(vector_store: VectorStore):
+    """Test error handling and logging in add_documents_with_retry (lines 417-419)."""
+    from unittest.mock import patch, AsyncMock
+
+    # Mock add_documents to raise an exception
+    with patch.object(vector_store, 'add_documents', new_callable=AsyncMock) as mock_add:
+        mock_add.side_effect = Exception("Test error")
+
+        # Should raise the exception and log error
+        with pytest.raises(Exception, match="Test error"):
+            await vector_store.add_documents_with_retry(
+                texts=["Test"],
+                metadata_list=[{"source": "test"}]
+            )
