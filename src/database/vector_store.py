@@ -46,11 +46,33 @@ logger = get_logger(__name__)
 Vector = Union[List[float], np.ndarray]
 
 def cosine_similarity(a: Vector, b: Vector) -> float:
-    """Calculate cosine similarity between two vectors."""
+    """
+    Calculate cosine similarity between two vectors.
+
+    Computes the cosine similarity metric, which measures the cosine of the angle
+    between two vectors. Returns a value between -1 and 1, where 1 means the
+    vectors are identical in direction, 0 means orthogonal, and -1 means opposite.
+
+    Args:
+        a: First vector, either as list of floats or numpy array
+        b: Second vector, either as list of floats or numpy array
+
+    Returns:
+        float: Cosine similarity score between -1.0 and 1.0
+
+    Example:
+        >>> vec1 = [1.0, 2.0, 3.0]
+        >>> vec2 = [2.0, 4.0, 6.0]
+        >>> similarity = cosine_similarity(vec1, vec2)
+        >>> print(f"Similarity: {similarity:.3f}")  # 1.000 (identical direction)
+    """
+    # Convert lists to numpy arrays for efficient computation
     if isinstance(a, list):
         a = np.array(a)
     if isinstance(b, list):
         b = np.array(b)
+
+    # Compute cosine similarity: dot(a,b) / (||a|| * ||b||)
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
 @dataclass
@@ -102,55 +124,90 @@ class VectorStore:
                 f,
                 indent=2
             )
-    
-    async def add_documents(self, 
+
+    def _validate_add_documents_input(
+        self,
+        texts: List[str],
+        metadata_list: List[Dict[str, Any]],
+        ids: Optional[List[str]] = None
+    ) -> None:
+        """
+        Validate inputs for add_documents methods.
+
+        Args:
+            texts: List of text strings to validate
+            metadata_list: List of metadata dictionaries to validate
+            ids: Optional list of IDs to validate
+
+        Raises:
+            ValueError: If inputs are invalid or mismatched
+        """
+        if not texts or not metadata_list:
+            raise ValueError("Texts and metadata lists cannot be empty")
+
+        if len(texts) != len(metadata_list):
+            raise ValueError("Number of texts must match number of metadata entries")
+
+        if ids and len(ids) != len(texts):
+            raise ValueError("If provided, ids must have same length as texts")
+
+    async def add_documents(self,
                           texts: List[str],
                           metadata_list: List[Dict[str, Any]],
                           ids: Optional[List[str]] = None,
                           batch_size: int = 32) -> List[str]:
         """
         Add multiple documents to the store with batched processing.
-        
+
         Args:
             texts: List of text strings
             metadata_list: List of metadata dictionaries
             ids: Optional list of IDs (generated if not provided)
             batch_size: Number of documents to process at once
-            
+
         Returns:
             List of document IDs
         """
-        if not texts or not metadata_list:
-            return []
-            
-        if len(texts) != len(metadata_list):
-            raise ValueError("texts and metadata_list must have same length")
-            
-        if ids and len(ids) != len(texts):
-            raise ValueError("if provided, ids must have same length as texts")
+        # Validate inputs using centralized validation
+        self._validate_add_documents_input(texts, metadata_list, ids)
             
         doc_ids = []
         
         async def process_batch(batch_start: int) -> List[Document]:
-            """Process a batch of documents."""
+            """
+            Process a single batch of documents with embeddings.
+
+            Handles text slicing, ID generation, embedding computation,
+            and Document object creation for a subset of inputs.
+
+            Args:
+                batch_start: Starting index for this batch
+
+            Returns:
+                List of Document objects with computed embeddings
+            """
+            # Calculate batch boundaries (handle edge case of last batch)
             batch_end = min(batch_start + batch_size, len(texts))
             batch_texts = texts[batch_start:batch_end]
             batch_metadata = metadata_list[batch_start:batch_end]
-            
-            # Get batch IDs
+
+            # Generate or use provided IDs for this batch
             if ids:
+                # Use pre-provided IDs if available
                 batch_ids = ids[batch_start:batch_end]
             else:
+                # Generate deterministic IDs from content hash
                 batch_ids = [
                     hashlib.sha256(text.encode()).hexdigest()
                     for text in batch_texts
                 ]
-            
-            # Generate embeddings
+
+            # Generate embeddings for all texts in batch (concurrent API call)
             batch_embeddings_dict = await self.embedding_generator.batch_generate_embeddings(batch_texts)
+            # Preserve order by mapping back to original text order
             batch_embeddings = [batch_embeddings_dict[text] for text in batch_texts]
-            
-            # Create documents
+
+            # Create Document objects combining text, embeddings, metadata, and IDs
             return [
                 Document(
                     text=text,
@@ -238,15 +295,27 @@ class VectorStore:
         doc_embeddings = np.array(doc_embeddings_list, dtype=np.float32)
         
         for query_embedding in query_embeddings:
-            # Calculate similarities efficiently using numpy
+            # Calculate cosine similarities efficiently using vectorized numpy operations
+            # Formula: cosine_sim = dot(query, doc) / (||query|| * ||doc||)
+
+            # Convert query embedding to numpy array for efficient computation
             query_array = np.array(query_embedding, dtype=np.float32)
+
+            # Compute dot products between query and all documents (vectorized)
             dot_products = np.dot(doc_embeddings, query_array)
+
+            # Compute L2 norms: ||query|| * ||doc|| for all documents
             norms = np.linalg.norm(doc_embeddings, axis=1) * np.linalg.norm(query_array)
+
+            # Compute cosine similarities with safe division (avoid divide-by-zero)
+            # Returns 0 for zero-norm vectors instead of NaN
             similarities = np.divide(dot_products, norms, out=np.zeros_like(dot_products), where=norms!=0)
             logger.info(f"Similarities: {similarities}")
-            
-            # Get top N indices (or all if fewer than N)
+
+            # Select top N most similar documents
+            # Get k (min of requested n_results and available documents)
             k = min(n_results, len(similarities))
+            # argsort returns indices sorted ascending, so take last k and reverse
             top_indices = np.argsort(similarities)[-k:][::-1]
             logger.info(f"Top indices: {top_indices}")
             
@@ -268,13 +337,45 @@ class VectorStore:
         return results
     
     def delete_collection(self):
-        """Delete the entire collection."""
+        """
+        Delete the entire collection and all its documents.
+
+        WARNING: This operation is irreversible. All documents and their embeddings
+        will be permanently removed from both memory and disk storage.
+
+        Side Effects:
+            - Deletes the collection file from disk (if exists)
+            - Clears all documents from memory
+            - Cannot be undone
+
+        Example:
+            >>> store = VectorStore(persist_directory="./db")
+            >>> store.delete_collection()  # All data will be lost!
+        """
+        # Remove persisted collection file if it exists
         if self.collection_path.exists():
             self.collection_path.unlink()
+
+        # Clear in-memory documents
         self.documents = []
-    
+
     def get_collection_stats(self) -> Dict[str, Any]:
-        """Get statistics about the collection."""
+        """
+        Get statistics and metadata about the current collection.
+
+        Returns:
+            Dictionary containing collection statistics with keys:
+                - total_documents (int): Number of documents in collection
+                - embedding_dim (int): Dimensionality of embeddings (0 if empty)
+                - persist_directory (str): Path to persistence directory
+                - collection_path (str): Path to collection JSON file
+
+        Example:
+            >>> store = VectorStore(persist_directory="./db")
+            >>> stats = store.get_collection_stats()
+            >>> print(f"Collection has {stats['total_documents']} documents")
+            >>> print(f"Embedding dimension: {stats['embedding_dim']}")
+        """
         return {
             "total_documents": len(self.documents),
             "embedding_dim": len(self.documents[0].embedding) if self.documents else 0,
@@ -291,25 +392,22 @@ class VectorStore:
     ) -> List[str]:
         """
         Add documents with retry logic.
-        
+
         Args:
             texts: List of text chunks
             metadata_list: List of metadata dictionaries
             batch_size: Number of documents to process at once
-            
+
         Returns:
             List of document IDs
-            
+
         Raises:
             ValueError: If texts or metadata_list are empty or mismatched
             Exception: For other unexpected errors during document addition
         """
-        if not texts or not metadata_list:
-            raise ValueError("Texts and metadata lists cannot be empty")
-            
-        if len(texts) != len(metadata_list):
-            raise ValueError("Number of texts must match number of metadata entries")
-        
+        # Validate inputs using centralized validation
+        self._validate_add_documents_input(texts, metadata_list)
+
         try:
             return await self.add_documents(
                 texts=texts,

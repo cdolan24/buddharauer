@@ -11,7 +11,6 @@ import fitz  # PyMuPDF
 from dataclasses import dataclass
 from datetime import datetime
 import time
-from functools import wraps
 
 from src.utils.paths import get_data_dir, list_pdf_files
 from src.utils.logging import get_logger
@@ -19,6 +18,7 @@ from .pdf_errors import (
     PDFExtractionError, PDFCorruptedError, PDFEncryptedError,
     PDFInvalidFormatError, PDFExtractionTimeout
 )
+from .recovery import with_retry_sync
 
 logger = get_logger(__name__)
 
@@ -43,26 +43,6 @@ class PDFPage:
     number: int
     text: str
     is_scanned: bool
-
-
-def retry_on_error(max_retries: int = 3, delay: float = 1.0):
-    """Decorator for retrying operations on temporary failures."""
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            last_error = None
-            for attempt in range(max_retries):
-                try:
-                    return func(*args, **kwargs)
-                except PDFExtractionError as e:
-                    last_error = e
-                    logger.warning(f"Attempt {attempt + 1}/{max_retries} failed: {str(e)}")
-                    if attempt < max_retries - 1:
-                        time.sleep(delay * (attempt + 1))  # Exponential backoff
-                    continue
-            raise last_error
-        return wrapper
-    return decorator
 
 class PDFExtractor:
     """Handles extraction of text and metadata from PDF files."""
@@ -156,7 +136,7 @@ class PDFExtractor:
         pages, _ = self.extract_text(pdf_path)
         return pages
 
-    @retry_on_error()
+    @with_retry_sync(max_retries=3, initial_delay=1.0)
     def extract_text(self, pdf_path: Path) -> tuple[List[PDFPage], PDFMetadata]:
         """
         Extract text and metadata from a PDF file.

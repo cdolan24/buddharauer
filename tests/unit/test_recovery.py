@@ -118,20 +118,21 @@ async def test_orchestrator_recovery(tmp_path, mock_chunk_pipeline, mock_vector_
         state_dir=recovery_dir
     )
     
-    # Create incomplete operation
+    # Create incomplete operation (in_progress state so it will be retried)
     state = orchestrator.recovery.start_operation(
         "process_pdf",
         {"pdf_path": str(test_pdf)}
     )
-    orchestrator.recovery.update_operation(state.operation_id, "failed", "test error")
-    
-    # Process directory
+    # Leave the operation in "in_progress" state (don't mark as failed)
+    # This simulates an interrupted operation that needs recovery
+
+    # Process directory - should retry the incomplete operation
     stats = await orchestrator.process_directory(pdf_dir)
-    
+
     # Verify recovery
-    assert stats.retry_successes == 1
-    assert stats.successful_files == 1
-    assert stats.failed_files == 0
+    assert stats.retry_successes == 1, f"Expected 1 retry success, got {stats.retry_successes}"
+    assert stats.successful_files == 1, f"Expected 1 successful file, got {stats.successful_files}"
+    assert stats.failed_files == 0, f"Expected 0 failed files, got {stats.failed_files}"
     assert mock_chunk_pipeline.process_file.call_count == 1
     assert mock_vector_store.add_documents.call_count == 1
 

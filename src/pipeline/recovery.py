@@ -120,14 +120,14 @@ def with_retry(
     exponential_base: float = 2.0
 ) -> Callable:
     """
-    Decorator for retrying operations with exponential backoff.
-    
+    Decorator for retrying async operations with exponential backoff.
+
     Args:
         max_retries: Maximum number of retry attempts
         initial_delay: Initial delay between retries in seconds
         max_delay: Maximum delay between retries in seconds
         exponential_base: Base for exponential backoff calculation
-        
+
     Returns:
         Decorated function with retry logic
     """
@@ -136,7 +136,7 @@ def with_retry(
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             last_error = None
             delay = initial_delay
-            
+
             for retry in range(max_retries + 1):
                 try:
                     return await func(*args, **kwargs)
@@ -145,17 +145,73 @@ def with_retry(
                     if retry == max_retries:
                         logger.error(f"Max retries ({max_retries}) reached for {func.__name__}")
                         raise
-                    
+
                     logger.warning(
                         f"Attempt {retry + 1}/{max_retries} failed for {func.__name__}: {str(e)}"
                     )
-                    
+
                     # Calculate next delay with exponential backoff
                     delay = min(delay * exponential_base, max_delay)
                     await asyncio.sleep(delay)
-            
+
             raise last_error  # This should never be reached
-            
+
+        return wrapper
+    return decorator
+
+
+def with_retry_sync(
+    max_retries: int = 3,
+    initial_delay: float = 1.0,
+    max_delay: float = 60.0,
+    exponential_base: float = 2.0
+) -> Callable:
+    """
+    Decorator for retrying synchronous operations with exponential backoff.
+
+    This is the synchronous version of with_retry() decorator, suitable for
+    non-async functions that need retry logic with exponential backoff.
+
+    Args:
+        max_retries: Maximum number of retry attempts
+        initial_delay: Initial delay between retries in seconds
+        max_delay: Maximum delay between retries in seconds
+        exponential_base: Base for exponential backoff calculation
+
+    Returns:
+        Decorated function with retry logic
+
+    Example:
+        @with_retry_sync(max_retries=3, initial_delay=1.0)
+        def extract_pdf(path):
+            # Operation that may fail
+            pass
+    """
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            last_error = None
+            delay = initial_delay
+
+            for retry in range(max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_error = e
+                    if retry == max_retries:
+                        logger.error(f"Max retries ({max_retries}) reached for {func.__name__}")
+                        raise
+
+                    logger.warning(
+                        f"Attempt {retry + 1}/{max_retries} failed for {func.__name__}: {str(e)}"
+                    )
+
+                    # Calculate next delay with exponential backoff
+                    delay = min(delay * exponential_base, max_delay)
+                    time.sleep(delay)
+
+            raise last_error  # This should never be reached
+
         return wrapper
     return decorator
 

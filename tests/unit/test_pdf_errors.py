@@ -93,11 +93,11 @@ def test_extraction_timeout():
 
 def test_retry_logic():
     """Test retry behavior on temporary failures."""
-    from src.pipeline.pdf_extractor import retry_on_error
+    from src.pipeline.recovery import with_retry_sync
 
     # Create a mock function that fails twice then succeeds
     call_count = [0]
-    @retry_on_error(max_retries=3, delay=0.01)
+    @with_retry_sync(max_retries=2, initial_delay=0.01)
     def mock_operation():
         call_count[0] += 1
         if call_count[0] < 3:
@@ -107,6 +107,8 @@ def test_retry_logic():
     result = mock_operation()
 
     assert result == "success"
+    # with_retry_sync counts max_retries differently - it's max_retries + 1 total attempts
+    # First attempt + 2 retries = 3 attempts total
     assert call_count[0] == 3
 
 def test_progress_tracking():

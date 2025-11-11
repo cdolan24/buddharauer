@@ -2,6 +2,7 @@
 import pytest
 from pathlib import Path
 import asyncio
+import shutil
 
 from src.pipeline.orchestrator import PipelineOrchestrator, ProcessingStats
 from src.pipeline.chunker import ChunkPipeline, SemanticChunker
@@ -10,16 +11,19 @@ from src.database.vector_store import VectorStore
 
 @pytest.fixture
 def test_files(tmp_path):
-    """Create test PDF files."""
-    # Create sample PDFs
+    """Create test PDF files by copying valid test PDF."""
+    # Create sample PDFs directory
     pdf_dir = tmp_path / "pdfs"
     pdf_dir.mkdir()
-    
-    # Create a few dummy PDFs
+
+    # Copy the valid test PDF file from tests/data/
+    source_pdf = Path(__file__).parent.parent / "data" / "test.pdf"
+
+    # Create multiple copies of the test PDF
     for i in range(3):
-        pdf_path = pdf_dir / f"test{i}.pdf"
-        pdf_path.write_bytes(b"%PDF-1.4\n")  # Minimal PDF header
-        
+        dest_pdf = pdf_dir / f"test{i}.pdf"
+        shutil.copy(source_pdf, dest_pdf)
+
     return pdf_dir
 
 
