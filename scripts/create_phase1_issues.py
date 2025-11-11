@@ -13,49 +13,14 @@ Requirements:
     - Set GITHUB_TOKEN environment variable
 """
 
-import os
 import sys
-import requests
+from github_utils import get_github_token, batch_create_issues, print_summary
 
-# GitHub repository information
-GITHUB_OWNER = "cdolan24"
-GITHUB_REPO = "buddharauer"
-GITHUB_API_URL = "https://api.github.com"
-
-def get_github_token() -> str:
-    """Get GitHub token from environment variable."""
-    token = os.getenv("GITHUB_TOKEN")
-    if not token:
-        print("❌ ERROR: GITHUB_TOKEN environment variable not set")
-        print("\nTo create a GitHub token:")
-        print("1. Go to https://github.com/settings/tokens")
-        print("2. Click 'Generate new token (classic)'")
-        print("3. Select 'repo' scope")
-        print("4. Copy the token and set: export GITHUB_TOKEN=your_token_here")
-        sys.exit(1)
-    return token
-
-def create_issue(token: str, title: str, body: str) -> dict:
-    """Create a GitHub issue."""
-    url = f"{GITHUB_API_URL}/repos/{GITHUB_OWNER}/{GITHUB_REPO}/issues"
-    headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-    data = {
-        "title": title,
-        "body": body,
-        "labels": ["phase-1", "priority"]
-    }
-    
-    response = requests.post(url, headers=headers, json=data)
-    response.raise_for_status()
-    return response.json()
-
-# Define Phase 1 priority issues
+# Define Phase 1 priority issues with default labels
 ISSUES = [
     {
         "title": "Implement Chunking Integration Pipeline",
+        "labels": ["phase-1", "priority"],
         "body": """**Phase**: 1 - Document Processing Pipeline
 **Priority**: High
 **Component**: Chunking Integration
@@ -90,6 +55,7 @@ Implement the chunking integration pipeline to connect PDF extraction with seman
     },
     {
         "title": "Implement Pipeline Orchestration System",
+        "labels": ["phase-1", "priority"],
         "body": """**Phase**: 1 - Document Processing Pipeline
 **Priority**: High
 **Component**: Pipeline Orchestration
@@ -126,6 +92,7 @@ Create the main pipeline orchestration system to manage the document processing 
     },
     {
         "title": "Implement Vector Store Integration",
+        "labels": ["phase-1", "priority"],
         "body": """**Phase**: 1 - Document Processing Pipeline
 **Priority**: Medium
 **Component**: Vector Store Integration
@@ -208,17 +175,21 @@ Develop the embedding generation module using Ollama's nomic-embed-text model.
 
 def main():
     """Create all Phase 1 priority issues."""
-    token = get_github_token()
-    
     print("Creating Phase 1 priority issues...")
-    for issue in ISSUES:
-        try:
-            response = create_issue(token, issue["title"], issue["body"])
-            print(f"✅ Created issue: {response['html_url']}")
-        except Exception as e:
-            print(f"❌ Error creating issue '{issue['title']}': {str(e)}")
-    
+    print()
+
+    # Get GitHub token
+    token = get_github_token()
+
+    # Create issues using shared utility function
+    created_issues, failed_issues = batch_create_issues(token, ISSUES, verbose=True)
+
+    # Print summary using shared utility function
+    print_summary(created_issues, failed_issues)
+
     print("\nDone! Check your GitHub repository for the new issues.")
 
+    return 0 if not failed_issues else 1
+
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

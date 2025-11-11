@@ -14,74 +14,14 @@ Requirements:
     - Set GITHUB_TOKEN environment variable
 """
 
-import os
 import sys
-import json
-from typing import List, Dict
-import requests
-
-
-# GitHub repository information
-GITHUB_OWNER = "cdolan24"  # GitHub username
-GITHUB_REPO = "buddharauer"
-GITHUB_API_URL = "https://api.github.com"
-
-
-def get_github_token() -> str:
-    """Get GitHub token from environment variable.
-
-    Returns:
-        GitHub personal access token
-
-    Raises:
-        SystemExit: If GITHUB_TOKEN is not set
-    """
-    token = os.getenv("GITHUB_TOKEN")
-    if not token:
-        print("❌ ERROR: GITHUB_TOKEN environment variable not set")
-        print("\nTo create a GitHub token:")
-        print("1. Go to https://github.com/settings/tokens")
-        print("2. Click 'Generate new token (classic)'")
-        print("3. Select 'repo' scope")
-        print("4. Copy the token and set: export GITHUB_TOKEN=your_token_here")
-        sys.exit(1)
-    return token
-
-
-def create_issue(
-    token: str,
-    title: str,
-    body: str,
-    labels: List[str]
-) -> Dict:
-    """Create a GitHub issue.
-
-    Args:
-        token: GitHub personal access token
-        title: Issue title
-        body: Issue body (markdown)
-        labels: List of label names
-
-    Returns:
-        Response JSON from GitHub API
-
-    Raises:
-        requests.HTTPError: If API request fails
-    """
-    url = f"{GITHUB_API_URL}/repos/{GITHUB_OWNER}/{GITHUB_REPO}/issues"
-    headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-    data = {
-        "title": title,
-        "body": body,
-        "labels": labels
-    }
-
-    response = requests.post(url, headers=headers, json=data)
-    response.raise_for_status()
-    return response.json()
+from github_utils import (
+    get_github_token,
+    batch_create_issues,
+    print_summary,
+    GITHUB_OWNER,
+    GITHUB_REPO
+)
 
 
 # Define all 36 issues from IMPLEMENTATION_PLAN.md
@@ -1967,61 +1907,11 @@ def main():
     print(f"📋 Creating {len(ISSUES)} issues...")
     print()
 
-    created_issues = []
-    failed_issues = []
+    # Create issues using shared utility function
+    created_issues, failed_issues = batch_create_issues(token, ISSUES, verbose=True)
 
-    for i, issue_data in enumerate(ISSUES, 1):
-        try:
-            print(f"[{i}/{len(ISSUES)}] Creating: {issue_data['title'][:50]}...")
-
-            result = create_issue(
-                token=token,
-                title=issue_data['title'],
-                body=issue_data['body'],
-                labels=issue_data['labels']
-            )
-
-            created_issues.append(result)
-            print(f"    ✅ Created: #{result['number']} - {result['html_url']}")
-
-        except requests.HTTPError as e:
-            error_msg = f"Failed: {issue_data['title']} - {e}"
-            failed_issues.append(error_msg)
-            print(f"    ❌ {error_msg}")
-
-            # Print error details
-            if e.response:
-                print(f"       Status: {e.response.status_code}")
-                print(f"       Error: {e.response.text}")
-
-        except Exception as e:
-            error_msg = f"Failed: {issue_data['title']} - {e}"
-            failed_issues.append(error_msg)
-            print(f"    ❌ {error_msg}")
-
-    # Summary
-    print()
-    print("=" * 70)
-    print("Summary")
-    print("=" * 70)
-    print(f"✅ Successfully created: {len(created_issues)} issues")
-    print(f"❌ Failed: {len(failed_issues)} issues")
-
-    if created_issues:
-        print()
-        print("Created Issues:")
-        for issue in created_issues:
-            print(f"  - #{issue['number']}: {issue['title']}")
-            print(f"    {issue['html_url']}")
-
-    if failed_issues:
-        print()
-        print("Failed Issues:")
-        for error in failed_issues:
-            print(f"  - {error}")
-
-    print()
-    print("=" * 70)
+    # Print summary using shared utility function
+    print_summary(created_issues, failed_issues)
 
     return 0 if not failed_issues else 1
 

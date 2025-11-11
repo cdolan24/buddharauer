@@ -12,49 +12,13 @@ Requirements:
     - Set GITHUB_TOKEN environment variable
 """
 
-import os
-import sys
-import requests
+from github_utils import get_github_token, batch_create_issues, print_summary
 
-# GitHub repository information
-GITHUB_OWNER = "cdolan24"
-GITHUB_REPO = "buddharauer"
-GITHUB_API_URL = "https://api.github.com"
-
-def get_github_token() -> str:
-    """Get GitHub token from environment variable."""
-    token = os.getenv("GITHUB_TOKEN")
-    if not token:
-        print("❌ ERROR: GITHUB_TOKEN environment variable not set")
-        print("\nTo create a GitHub token:")
-        print("1. Go to https://github.com/settings/tokens")
-        print("2. Click 'Generate new token (classic)'")
-        print("3. Select 'repo' scope")
-        print("4. Copy the token and set: export GITHUB_TOKEN=your_token_here")
-        sys.exit(1)
-    return token
-
-def create_issue(token: str, title: str, body: str) -> dict:
-    """Create a GitHub issue."""
-    url = f"{GITHUB_API_URL}/repos/{GITHUB_OWNER}/{GITHUB_REPO}/issues"
-    headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-    data = {
-        "title": title,
-        "body": body,
-        "labels": ["phase-1", "priority", "embedding"]
-    }
-    
-    response = requests.post(url, headers=headers, json=data)
-    response.raise_for_status()
-    return response.json()
-
-# Define embedding generation issues
+# Define embedding generation issues with default labels
 ISSUES = [
     {
         "title": "Implement Embedding Generation with Ollama",
+        "labels": ["phase-1", "priority", "embedding"],
         "body": """**Phase**: 1 - Document Processing Pipeline
 **Priority**: High
 **Component**: Embedding Generation
@@ -100,6 +64,7 @@ Implement embedding generation module using Ollama's nomic-embed-text model for 
     },
     {
         "title": "Integrate Embeddings with Vector Store",
+        "labels": ["phase-1", "priority", "embedding"],
         "body": """**Phase**: 1 - Document Processing Pipeline
 **Priority**: High
 **Component**: Vector Storage
@@ -135,6 +100,7 @@ Integrate the embedding generation module with ChromaDB for efficient vector sto
     },
     {
         "title": "Add Embedding System Improvements",
+        "labels": ["phase-1", "priority", "embedding"],
         "body": """**Phase**: 1 - Document Processing Pipeline
 **Priority**: Medium
 **Component**: Embedding System
@@ -170,13 +136,21 @@ Enhance the embedding system with additional features and robustness improvement
 ]
 
 def main():
-    """Create GitHub issues."""
+    """Create GitHub issues for embedding generation."""
+    print("Creating embedding generation issues...")
+    print()
+
+    # Get GitHub token
     token = get_github_token()
-    
-    for issue in ISSUES:
-        print(f"Creating issue: {issue['title']}")
-        response = create_issue(token, issue["title"], issue["body"])
-        print(f"Created issue #{response['number']}")
+
+    # Create issues using shared utility function
+    created_issues, failed_issues = batch_create_issues(token, ISSUES, verbose=True)
+
+    # Print summary using shared utility function
+    print_summary(created_issues, failed_issues)
+
+    return 0 if not failed_issues else 1
 
 if __name__ == "__main__":
-    main()
+    import sys
+    sys.exit(main())
