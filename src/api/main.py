@@ -43,7 +43,7 @@ from contextlib import asynccontextmanager
 from typing import Dict, Any
 import time
 
-from src.api.routes import health_router, documents_router, search_router
+from src.api.routes import health_router, documents_router, search_router, chat_router
 from src.utils.logging import get_logger
 from src.api.models.responses import ErrorResponse
 
@@ -227,6 +227,7 @@ async def generic_exception_handler(request: Request, exc: Exception):
 app.include_router(health_router)
 app.include_router(documents_router)
 app.include_router(search_router)
+app.include_router(chat_router)
 
 
 # Root endpoint

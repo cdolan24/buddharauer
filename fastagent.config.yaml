@@ -1,26 +1,33 @@
-# FastAgent Configuration for Buddharauer
+# FastAgent Configuration for Buddharauer V2
 # This file configures FastAgent's LLM provider to use local Ollama models
+#
+# Architecture: FastAgent (framework) → Generic Provider → Ollama (localhost:11434)
+#
+# Last Updated: 2025-11-11
 
 # Generic OpenAI/Ollama Provider Configuration
 # This provider uses Ollama's OpenAI-compatible API endpoint
 generic:
-  # Default API key for Ollama (not validated)
+  # Default API key for Ollama (placeholder, not validated by Ollama)
   api_key: "ollama"
-  # Ollama's OpenAI-compatible endpoint  
+
+  # Ollama's OpenAI-compatible endpoint
+  # This endpoint provides chat completions, embeddings, and tool calling
   base_url: "http://localhost:11434/v1"
 
   # Model configurations
+  # Note: Model names must match exactly what's in Ollama
   models:
-    # Main orchestrator and analyst model
-    llama2:
-      name: "llama2:latest"
+    # Main orchestrator and analyst model (Tested by FastAgent)
+    llama3:
+      name: "llama3.2:latest"
       context_size: 4096
       temperature: 0.7
       max_tokens: 2048
 
-    # Better tool calling model
+    # Better tool calling model (Recommended for retrieval)
     qwen:
-      name: "qwen:latest"
+      name: "qwen2.5:latest"
       context_size: 8192
       temperature: 0.5
       max_tokens: 2048
@@ -32,7 +39,7 @@ generic:
       temperature: 0.3
       max_tokens: 1024
 
-    # Embeddings model
+    # Embeddings model (for nomic-embed-text)
     nomic:
       name: "nomic-embed-text"
       context_size: 8192

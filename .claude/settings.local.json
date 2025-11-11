@@ -17,7 +17,12 @@
       "Bash(mkdir:*)",
       "Bash(pip install:*)",
       "Bash(=0.19.0)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(nul)",
+      "Bash(dir:*)",
+      "Bash(curl:*)",
+      "Bash(ollama pull:*)",
+      "Bash(.gitignore)"
     ],
     "deny": [],
     "ask": []

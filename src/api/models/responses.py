@@ -315,3 +315,119 @@ class ErrorResponse(BaseModel):
             }
         }
     )
+
+
+class SourceReference(BaseModel):
+    """
+    A source reference for chat responses.
+
+    Represents a document chunk that was used to generate the response.
+    Includes metadata for citation and navigation.
+
+    Attributes:
+        document_id: Source document identifier
+        document_title: Human-readable document title
+        chunk_id: Specific chunk identifier
+        page: Page number in source document
+        text: Excerpt from the source
+        relevance_score: How relevant this source is (0-1)
+
+    Example:
+        {
+            "document_id": "doc_001",
+            "document_title": "Fellowship of the Ring",
+            "chunk_id": "doc_001_chunk_042",
+            "page": 42,
+            "text": "Aragorn stepped forward...",
+            "relevance_score": 0.95
+        }
+    """
+    document_id: str = Field(..., description="Source document ID")
+    document_title: str = Field(..., description="Document title")
+    chunk_id: str = Field(..., description="Chunk ID")
+    page: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="Page number"
+    )
+    text: str = Field(..., description="Source text excerpt")
+    relevance_score: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Relevance score"
+    )
+
+
+class ChatResponse(BaseModel):
+    """
+    Response model for chat/conversation interactions.
+
+    Contains the agent's response along with source citations and metadata.
+    The response may come from different agents (orchestrator, analyst, retrieval).
+
+    Attributes:
+        response: The agent's response text
+        sources: List of source document references
+        conversation_id: Conversation identifier
+        agent_used: Which agent generated the response
+        processing_time_ms: Response generation time in milliseconds
+        metadata: Additional response metadata
+
+    Example:
+        {
+            "response": "Aragorn is a ranger and the heir to the throne...",
+            "sources": [
+                {
+                    "document_id": "doc_001",
+                    "document_title": "Fellowship of the Ring",
+                    "chunk_id": "doc_001_chunk_042",
+                    "page": 42,
+                    "text": "Aragorn stepped forward...",
+                    "relevance_score": 0.95
+                }
+            ],
+            "conversation_id": "session_123",
+            "agent_used": "orchestrator",
+            "processing_time_ms": 1234.5,
+            "metadata": {"query_type": "question"}
+        }
+    """
+    response: str = Field(..., description="Agent's response text")
+    sources: List[SourceReference] = Field(
+        default_factory=list,
+        description="Source document references"
+    )
+    conversation_id: str = Field(..., description="Conversation ID")
+    agent_used: str = Field(..., description="Agent that handled the query")
+    processing_time_ms: float = Field(
+        ...,
+        ge=0.0,
+        description="Processing time in milliseconds"
+    )
+    metadata: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Additional metadata"
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "response": "Aragorn is a ranger and the rightful heir to the throne of Gondor...",
+                "sources": [
+                    {
+                        "document_id": "doc_001",
+                        "document_title": "The Fellowship of the Ring",
+                        "chunk_id": "doc_001_chunk_042",
+                        "page": 42,
+                        "text": "Aragorn, son of Arathorn, stepped forward...",
+                        "relevance_score": 0.95
+                    }
+                ],
+                "conversation_id": "session_abc123",
+                "agent_used": "orchestrator",
+                "processing_time_ms": 1234.5,
+                "metadata": {"query_type": "question", "mode": "explanatory"}
+            }
+        }
+    )

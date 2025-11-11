@@ -121,3 +121,64 @@ class DocumentUploadRequest(BaseModel):
             }
         }
     )
+
+
+class ChatRequest(BaseModel):
+    """
+    Request model for chat/conversation interactions.
+
+    This model supports multi-turn conversations with the FastAgent orchestrator.
+    The orchestrator routes questions to appropriate sub-agents based on intent.
+
+    Attributes:
+        message: User's question or message
+        conversation_id: Unique identifier for conversation thread
+        user_id: Optional user identifier for tracking
+        context: Optional context information (document filters, mode)
+
+    Example:
+        {
+            "message": "Who is Aragorn?",
+            "conversation_id": "session_123",
+            "user_id": "faraday",
+            "context": {
+                "documents": ["doc_001"],
+                "mode": "explanatory"
+            }
+        }
+    """
+    message: str = Field(
+        ...,
+        min_length=1,
+        max_length=10000,
+        description="User's message or question"
+    )
+    conversation_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="Unique conversation/session identifier"
+    )
+    user_id: Optional[str] = Field(
+        default=None,
+        max_length=100,
+        description="Optional user identifier"
+    )
+    context: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Optional context (document filters, conversation mode)"
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "message": "Who is Gandalf and what is his role?",
+                "conversation_id": "session_abc123",
+                "user_id": "faraday",
+                "context": {
+                    "documents": ["fellowship", "two_towers"],
+                    "mode": "explanatory"
+                }
+            }
+        }
+    )
