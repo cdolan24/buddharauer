@@ -1,6 +1,89 @@
 """
-Monitoring system for pipeline components.
-Provides real-time metrics, progress tracking, and performance monitoring.
+Comprehensive monitoring and metrics system for the document processing pipeline.
+
+This module provides real-time monitoring, metrics collection, and progress
+tracking for all pipeline operations. It supports multiple metric types,
+automatic persistence, and integration with external monitoring systems.
+
+Key Features:
+    - Multiple metric types (counter, gauge, histogram, rate)
+    - Progress tracking with ETA calculation
+    - Automatic metric persistence to disk
+    - Context managers for operation timing
+    - Label-based metric filtering
+    - Thread-safe operation
+
+Metric Types:
+    - COUNTER: Monotonically increasing values (e.g., docs processed, errors)
+    - GAUGE: Point-in-time values (e.g., memory usage, queue depth)
+    - HISTOGRAM: Distribution of values (e.g., processing times, chunk sizes)
+    - RATE: Per-second rates (e.g., throughput, requests/sec)
+
+Usage Example - Basic Metrics:
+    >>> from src.pipeline.monitoring import monitor, Metric, MetricType
+    >>>
+    >>> # Record a counter metric
+    >>> monitor.record_metric(Metric(
+    ...     name="documents_processed",
+    ...     value=1,
+    ...     type=MetricType.COUNTER,
+    ...     labels={"status": "success"}
+    ... ))
+    >>>
+    >>> # Record processing time
+    >>> with monitor.track_operation_time("pdf_extraction"):
+    ...     # Do work...
+    ...     process_pdf()
+
+Usage Example - Progress Tracking:
+    >>> # Start tracking progress
+    >>> monitor.start_progress("document_processing", total_items=100)
+    >>>
+    >>> for i, doc in enumerate(documents):
+    ...     process(doc)
+    ...     monitor.update_progress(
+    ...         "document_processing",
+    ...         completed=i+1,
+    ...         current_item=doc.name,
+    ...         status="processing"
+    ...     )
+    >>>
+    >>> # Get progress info
+    >>> info = monitor.get_progress("document_processing")
+    >>> print(f"Progress: {info.completed_items}/{info.total_items}")
+    >>> print(f"ETA: {info.eta} seconds")
+
+Usage Example - Operation Timing:
+    >>> # Automatic timing with context manager
+    >>> with monitor.track_operation_time("vector_insert", {"batch_size": "32"}):
+    ...     await vector_store.insert(documents)
+    >>>
+    >>> # Duration is automatically recorded as a histogram metric
+
+Metric Persistence:
+    Metrics are automatically persisted to disk in JSONL format:
+    - One file per metric name per day
+    - Location: `metrics_dir/{YYYY-MM-DD}/{metric_name}.jsonl`
+    - Format: One JSON object per line with timestamp, value, labels
+    - Automatic daily rotation
+
+Integration:
+    The monitoring system can be extended to integrate with:
+    - Prometheus (via prometheus_client library)
+    - DataDog (via datadog API)
+    - CloudWatch (via boto3)
+    - Custom monitoring solutions (via callbacks)
+
+Performance:
+    - Low overhead (<1ms per metric recording)
+    - Async-safe for concurrent operations
+    - Automatic batching for file writes
+    - Configurable flush intervals
+
+See Also:
+    - PipelineOrchestrator: Uses monitoring for pipeline metrics
+    - RecoveryManager: Uses monitoring for retry tracking
+    - VectorStore: Uses monitoring for performance metrics
 """
 import time
 from dataclasses import dataclass, field

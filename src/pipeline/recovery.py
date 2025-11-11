@@ -1,5 +1,73 @@
 """
-Utilities for error recovery and resilience in the pipeline.
+Error recovery and resilience utilities for the document processing pipeline.
+
+This module provides mechanisms for handling failures gracefully and recovering
+from crashes or errors during document processing. It implements retry logic
+with exponential backoff and state persistence for resuming operations.
+
+Key Components:
+    - RecoveryState: Tracks the state of in-progress operations
+    - RecoveryManager: Persists state to disk for crash recovery
+    - with_retry: Decorator for automatic retry with exponential backoff
+
+Usage Example - Retry Decorator:
+    >>> @with_retry(max_retries=3, initial_delay=1.0)
+    >>> async def process_document(doc_path):
+    ...     # Operation that might fail
+    ...     result = await api_call(doc_path)
+    ...     return result
+    >>>
+    >>> # Automatically retries up to 3 times with exponential backoff
+    >>> result = await process_document("path/to/doc.pdf")
+
+Usage Example - State Management:
+    >>> from pathlib import Path
+    >>> manager = RecoveryManager(Path("data/recovery"))
+    >>>
+    >>> # Start tracking an operation
+    >>> state = manager.start_operation(
+    ...     "process_pdf",
+    ...     {"pdf_path": "document.pdf"}
+    ... )
+    >>>
+    >>> try:
+    ...     # Do work...
+    ...     manager.update_operation(state.operation_id, "completed")
+    ... except Exception as e:
+    ...     manager.update_operation(state.operation_id, "failed", str(e))
+    >>>
+    >>> # Later, after a crash, recover pending operations
+    >>> pending = manager.get_pending_operations()
+    >>> for state in pending:
+    ...     # Resume work...
+    ...     pass
+
+Retry Strategy:
+    The retry decorator implements exponential backoff with jitter:
+    - Retry 1: Wait ~1 second
+    - Retry 2: Wait ~2 seconds
+    - Retry 3: Wait ~4 seconds
+    - Retry 4: Wait ~8 seconds (up to max_delay)
+
+    This prevents overwhelming failing services while giving transient
+    errors time to resolve.
+
+State Persistence:
+    Operation state is persisted to JSON files in the recovery directory:
+    - Each operation gets a unique ID based on timestamp
+    - State includes operation type, input data, status, and error info
+    - Files are cleaned up after successful completion
+    - Pending operations can be resumed after crashes
+
+Error Handling:
+    The module distinguishes between:
+    - Transient errors (network timeouts, rate limits) - retry automatically
+    - Permanent errors (invalid input, auth failures) - fail immediately
+    - Resource errors (out of memory, disk full) - log and propagate
+
+See Also:
+    - PipelineOrchestrator: Uses recovery for processing PDFs
+    - with_retry: For decorating async functions with retry logic
 """
 from dataclasses import dataclass
 from typing import TypeVar, Callable, Any, Optional, Dict

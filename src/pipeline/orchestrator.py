@@ -1,6 +1,59 @@
 """
 Pipeline orchestrator for processing PDFs into the vector store.
-Handles document processing, chunking, and vector storage with error recovery.
+
+This module provides the main orchestration layer for the document processing
+pipeline. It coordinates PDF extraction, chunking, embedding generation, and
+vector storage while providing resilient error recovery and comprehensive
+monitoring.
+
+Key Features:
+    - Batch processing of multiple PDFs
+    - Automatic retry with exponential backoff
+    - State persistence for recovery from failures
+    - Comprehensive metrics and monitoring
+    - Duplicate detection to avoid reprocessing
+
+Usage Example:
+    >>> from pathlib import Path
+    >>> from src.pipeline.chunker import ChunkPipeline, SemanticChunker
+    >>> from src.database.vector_store import VectorStore
+    >>>
+    >>> # Initialize components
+    >>> chunker = SemanticChunker(chunk_size=800, chunk_overlap=150)
+    >>> chunk_pipeline = ChunkPipeline(chunker)
+    >>> vector_store = VectorStore("./vector_db")
+    >>>
+    >>> # Create orchestrator
+    >>> orchestrator = PipelineOrchestrator(
+    ...     chunk_pipeline=chunk_pipeline,
+    ...     vector_store=vector_store,
+    ...     batch_size=32
+    ... )
+    >>>
+    >>> # Process a directory of PDFs
+    >>> import asyncio
+    >>> stats = asyncio.run(orchestrator.process_directory(Path("data")))
+    >>> print(f"Processed {stats.successful_files}/{stats.total_files} files")
+    >>> print(f"Total chunks: {stats.total_chunks}")
+
+Error Recovery:
+    The orchestrator implements comprehensive error recovery:
+    - Failed operations are automatically retried (up to 3 times)
+    - State is persisted to disk for crash recovery
+    - Duplicate processing is prevented
+    - Failed files don't block processing of other files
+
+Monitoring:
+    All operations are tracked with detailed metrics:
+    - Processing time per file
+    - Chunk and token counts
+    - Success/failure rates
+    - Retry statistics
+
+See Also:
+    - ChunkPipeline: For PDF chunking configuration
+    - VectorStore: For vector database operations
+    - RecoveryManager: For state persistence details
 """
 from dataclasses import dataclass
 from pathlib import Path
