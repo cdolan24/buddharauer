@@ -34,6 +34,9 @@ import httpx
 from src.api.models.responses import HealthResponse
 from src.utils.logging import get_logger
 
+# Import dependency injection functions
+from src.api.dependencies import get_vector_store, get_document_registry
+
 logger = get_logger(__name__)
 
 # Create router for health endpoints
@@ -115,7 +118,10 @@ async def get_documents_count(vector_store) -> int:
 
 
 @router.get("", response_model=HealthResponse, status_code=200)
-async def health_check():
+async def health_check(
+    vector_store = Depends(get_vector_store),
+    registry = Depends(get_document_registry)
+):
     """
     Comprehensive system health check.
 
@@ -123,6 +129,10 @@ async def health_check():
     - Ollama LLM service
     - Vector database
     - Document index
+
+    Args:
+        vector_store: VectorStore instance (injected dependency)
+        registry: DocumentRegistry instance (injected dependency)
 
     Returns:
         HealthResponse: Complete system health status
@@ -140,28 +150,32 @@ async def health_check():
         This endpoint is designed to be called frequently by monitoring systems.
         It should complete quickly (< 1 second) to avoid blocking.
     """
-    # TODO: Get VectorStore instance from app state once dependency injection is set up
-    # For now, we'll return a basic response
-
     # Check Ollama connectivity
     ollama_healthy = await check_ollama_health()
+
+    # Check vector database health
+    vector_db_status = await check_vector_db_health(vector_store)
+
+    # Get document count from vector store
+    documents_indexed = await get_documents_count(vector_store)
 
     # Calculate uptime
     uptime = time.time() - API_START_TIME
 
     # Determine overall status
-    # System is healthy if Ollama is connected
-    # Vector DB will be checked once we have dependency injection
-    if ollama_healthy:
+    # System is healthy if all critical components are operational
+    if ollama_healthy and vector_db_status == "operational":
         overall_status = "healthy"
-    else:
+    elif ollama_healthy or vector_db_status == "operational":
         overall_status = "degraded"
+    else:
+        overall_status = "unhealthy"
 
     return HealthResponse(
         status=overall_status,
         ollama_connected=ollama_healthy,
-        vector_db_status="operational",  # TODO: Check actual vector DB once DI is ready
-        documents_indexed=0,  # TODO: Get actual count once DI is ready
+        vector_db_status=vector_db_status,
+        documents_indexed=documents_indexed,
         uptime_seconds=uptime
     )
 

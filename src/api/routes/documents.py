@@ -26,7 +26,7 @@ Usage Example:
     GET /api/documents/doc_001/content?format=markdown
 """
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, HTTPException, UploadFile, File, Query, Depends
 from typing import List, Optional
 from pathlib import Path
 import time
@@ -39,6 +39,10 @@ from src.api.models.responses import (
     ErrorResponse
 )
 from src.utils.logging import get_logger
+
+# Import dependency injection functions
+# These will be used to access shared services (DocumentRegistry, VectorStore)
+from src.api.dependencies import get_document_registry, get_vector_store
 
 logger = get_logger(__name__)
 
@@ -57,7 +61,8 @@ router = APIRouter(
 async def list_documents(
     page: int = Query(default=1, ge=1, description="Page number"),
     page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
-    status: Optional[str] = Query(default=None, description="Filter by status")
+    status: Optional[str] = Query(default=None, description="Filter by status"),
+    registry = Depends(get_document_registry)
 ):
     """
     List all documents in the system with pagination.
@@ -65,7 +70,8 @@ async def list_documents(
     Args:
         page: Page number (1-indexed)
         page_size: Number of items per page (max 100)
-        status: Optional filter by processing status
+        status: Optional filter by processing status (pending, processing, completed, failed)
+        registry: DocumentRegistry instance (injected dependency)
 
     Returns:
         DocumentListResponse: Paginated list of documents
@@ -76,28 +82,52 @@ async def list_documents(
         curl http://localhost:8000/api/documents?page=1&page_size=20
 
         # Filter by status
-        curl http://localhost:8000/api/documents?status=processed
+        curl http://localhost:8000/api/documents?status=completed
         ```
 
     Note:
         Documents are sorted by creation date (newest first).
     """
     try:
-        # TODO: Implement actual document listing from database
-        # This would:
-        # 1. Query document registry
-        # 2. Apply status filter if provided
-        # 3. Apply pagination
-        # 4. Return results with total count
-
         logger.info(
             f"Listing documents: page={page}, page_size={page_size}, status={status}"
         )
 
-        # Placeholder response
+        # Calculate offset for pagination (page is 1-indexed)
+        offset = (page - 1) * page_size
+
+        # Query documents based on status filter
+        if status:
+            # Filter by specific status
+            documents = await registry.get_by_status(status)
+            # Apply pagination manually for status-filtered results
+            paginated_docs = documents[offset:offset + page_size]
+            total = len(documents)
+        else:
+            # Get all documents with pagination
+            paginated_docs = await registry.list_all(limit=page_size, offset=offset)
+            # Get total count (this is a simplified approach; in production you'd want a count query)
+            all_docs = await registry.list_all()
+            total = len(all_docs)
+
+        # Convert DocumentRecord objects to DocumentResponse format
+        document_responses = [
+            DocumentResponse(
+                id=doc.id,
+                title=doc.filename,  # Use filename as title for now
+                filename=doc.filename,
+                pages=doc.pages or 0,
+                chunks=doc.chunk_count or 0,
+                status=doc.status,
+                created_at=doc.created_at,
+                processed_at=doc.processing_end
+            )
+            for doc in paginated_docs
+        ]
+
         return DocumentListResponse(
-            documents=[],
-            total=0,
+            documents=document_responses,
+            total=total,
             page=page,
             page_size=page_size
         )
@@ -115,15 +145,19 @@ async def list_documents(
 
 
 @router.get("/{document_id}", response_model=DocumentResponse, status_code=200)
-async def get_document(document_id: str):
+async def get_document(
+    document_id: str,
+    registry = Depends(get_document_registry)
+):
     """
     Get details for a specific document.
 
     Args:
-        document_id: Unique document identifier
+        document_id: Unique document identifier (hash of file content)
+        registry: DocumentRegistry instance (injected dependency)
 
     Returns:
-        DocumentResponse: Complete document metadata
+        DocumentResponse: Complete document metadata including status and statistics
 
     Raises:
         HTTPException 404: Document not found
@@ -131,44 +165,54 @@ async def get_document(document_id: str):
 
     Example:
         ```bash
-        curl http://localhost:8000/api/documents/doc_001
+        curl http://localhost:8000/api/documents/abc123def456
         ```
 
     Response:
         ```json
         {
-            "id": "doc_001",
+            "id": "abc123def456",
             "title": "Fellowship of the Ring",
             "filename": "fellowship.pdf",
             "pages": 432,
             "chunks": 284,
-            "status": "processed",
+            "status": "completed",
             "created_at": "2025-01-15T14:23:01Z",
             "processed_at": "2025-01-15T14:25:42Z"
         }
         ```
     """
     try:
-        # TODO: Implement document retrieval from database
-        # This would:
-        # 1. Query document registry by ID
-        # 2. Return 404 if not found
-        # 3. Return document details
-
         logger.info(f"Retrieving document: {document_id}")
 
-        # Placeholder - return 404 for now
-        raise HTTPException(
-            status_code=404,
-            detail=ErrorResponse(
-                error="NotFoundError",
-                message="Document not found",
-                details={"document_id": document_id}
-            ).model_dump()
+        # Query document registry for the document
+        doc = await registry.get_by_id(document_id)
+
+        # Return 404 if document doesn't exist
+        if not doc:
+            raise HTTPException(
+                status_code=404,
+                detail=ErrorResponse(
+                    error="NotFoundError",
+                    message="Document not found",
+                    details={"document_id": document_id}
+                ).model_dump()
+            )
+
+        # Convert DocumentRecord to DocumentResponse
+        return DocumentResponse(
+            id=doc.id,
+            title=doc.filename,  # Use filename as title for now
+            filename=doc.filename,
+            pages=doc.pages or 0,
+            chunks=doc.chunk_count or 0,
+            status=doc.status,
+            created_at=doc.created_at,
+            processed_at=doc.processing_end
         )
 
     except HTTPException:
-        # Re-raise HTTP exceptions
+        # Re-raise HTTP exceptions (like 404)
         raise
     except Exception as e:
         logger.error(f"Failed to retrieve document {document_id}: {e}", exc_info=True)

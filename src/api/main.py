@@ -50,10 +50,12 @@ from src.api.models.responses import ErrorResponse
 logger = get_logger(__name__)
 
 # Application state for tracking startup time and shared resources
+# These are initialized during the lifespan startup phase and used for dependency injection
 app_state: Dict[str, Any] = {
     "start_time": time.time(),
-    "vector_store": None,  # Will be initialized in lifespan
-    "document_registry": None,  # Will be initialized in lifespan
+    "vector_store": None,  # VectorStore instance for semantic search
+    "document_registry": None,  # DocumentRegistry for tracking document metadata
+    "query_logger": None,  # QueryLogger for tracking user queries and analytics
 }
 
 
@@ -83,17 +85,27 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Buddharauer API...")
 
     try:
-        # TODO: Initialize VectorStore
-        # from src.database.vector_store import VectorStore
-        # app_state["vector_store"] = VectorStore("./vector_db")
-        # logger.info("Vector store initialized")
+        # Initialize VectorStore for semantic search
+        from src.database.vector_store import VectorStore
+        app_state["vector_store"] = VectorStore(
+            persist_directory="./vector_db",
+            collection_name="documents"
+        )
+        logger.info("Vector store initialized")
 
-        # TODO: Initialize DocumentRegistry
-        # from src.database.document_registry import DocumentRegistry
-        # app_state["document_registry"] = DocumentRegistry()
-        # logger.info("Document registry initialized")
+        # Initialize DocumentRegistry for tracking document metadata
+        from src.database.document_registry import DocumentRegistry
+        app_state["document_registry"] = DocumentRegistry("data_storage/documents.db")
+        await app_state["document_registry"].initialize()
+        logger.info("Document registry initialized")
 
-        logger.info("API startup complete")
+        # Initialize QueryLogger for tracking user queries
+        from src.database.query_logger import QueryLogger
+        app_state["query_logger"] = QueryLogger("data_storage/queries.db")
+        await app_state["query_logger"].initialize()
+        logger.info("Query logger initialized")
+
+        logger.info("API startup complete - all services initialized")
 
     except Exception as e:
         logger.error(f"Startup failed: {e}", exc_info=True)
@@ -105,11 +117,21 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down Buddharauer API...")
 
     try:
-        # TODO: Cleanup resources
-        # if app_state.get("vector_store"):
-        #     app_state["vector_store"].close()
+        # Cleanup VectorStore resources
+        # Note: Current VectorStore implementation doesn't require explicit cleanup
+        # Future ChromaDB integration may need client.close() or similar
+        if app_state.get("vector_store"):
+            logger.debug("VectorStore cleanup complete")
 
-        logger.info("API shutdown complete")
+        # Cleanup database connections
+        # Note: aiosqlite connections are context-managed and auto-closed
+        # No explicit cleanup needed for DocumentRegistry or QueryLogger
+        if app_state.get("document_registry"):
+            logger.debug("DocumentRegistry cleanup complete")
+        if app_state.get("query_logger"):
+            logger.debug("QueryLogger cleanup complete")
+
+        logger.info("API shutdown complete - all resources cleaned up")
 
     except Exception as e:
         logger.error(f"Shutdown error: {e}", exc_info=True)
@@ -242,51 +264,8 @@ async def root():
     }
 
 
-# Utility function to get shared services (for dependency injection)
-def get_vector_store():
-    """
-    Dependency injection for VectorStore.
-
-    Returns:
-        VectorStore instance from application state
-
-    Raises:
-        RuntimeError: If vector store not initialized
-
-    Usage:
-        ```python
-        @app.get("/some-endpoint")
-        async def endpoint(vector_store = Depends(get_vector_store)):
-            results = vector_store.search(...)
-            return results
-        ```
-    """
-    if app_state.get("vector_store") is None:
-        raise RuntimeError("Vector store not initialized")
-    return app_state["vector_store"]
-
-
-def get_document_registry():
-    """
-    Dependency injection for DocumentRegistry.
-
-    Returns:
-        DocumentRegistry instance from application state
-
-    Raises:
-        RuntimeError: If document registry not initialized
-
-    Usage:
-        ```python
-        @app.get("/some-endpoint")
-        async def endpoint(registry = Depends(get_document_registry)):
-            docs = registry.list_all()
-            return docs
-        ```
-    """
-    if app_state.get("document_registry") is None:
-        raise RuntimeError("Document registry not initialized")
-    return app_state["document_registry"]
+# Note: Dependency injection functions moved to src/api/dependencies.py
+# to avoid circular import issues with routes
 
 
 if __name__ == "__main__":

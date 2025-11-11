@@ -167,6 +167,84 @@ except SpecificError as e:
    - Added document storage and search
    - ChromaDB-compatible API for future migration
 
+### 7. Next Development Tasks (Updated Nov 11, 2025 - Session 7)
+
+**Session 7 Completed Tasks** ✅:
+
+1. ✅ **Phase 2: FastAPI Backend - 95% Complete**:
+   - Created `src/database/query_logger.py` - Full query logging and analytics system
+   - Created `src/api/dependencies.py` - Dependency injection to avoid circular imports
+   - Wired up VectorStore, DocumentRegistry, and QueryLogger in application lifespan
+   - Implemented all API routes with real database integration:
+     - `/api/documents` - List with pagination and filtering
+     - `/api/documents/{id}` - Get document by ID
+     - `/api/search` - Vector search with metadata enrichment
+     - `/api/health` - Real service health checks
+   - Fixed circular import issues between routes and main.py
+   - Updated integration tests with proper mocking
+   - **All 115 tests passing** ✅
+   - **Test coverage: 89.16%** (target: 90%)
+
+2. ✅ **Code Quality Improvements**:
+   - All new code has comprehensive Google-style docstrings
+   - Added inline comments explaining complex logic
+   - Proper type hints throughout
+   - Consistent error handling patterns
+   - Clean separation of concerns (dependencies module)
+
+3. ✅ **Testing Infrastructure**:
+   - Fixed test mocking for dependency injection
+   - All integration tests passing
+   - Coverage very close to 90% target
+
+**Key Technical Decisions**:
+
+1. **Dependency Injection Pattern**:
+   - Created separate `dependencies.py` module to avoid circular imports
+   - FastAPI `app.dependency_overrides` used in tests for mocking
+   - Services initialized in lifespan manager for proper startup/shutdown
+
+2. **Query Logger Design**:
+   - SQLite-based for simplicity and portability
+   - Tracks queries, responses, sources, and performance metrics
+   - Supports analytics (popular queries, success rates, response times)
+   - Automatic cleanup of old queries
+
+3. **API Integration**:
+   - All routes use async/await properly
+   - Dependency injection via FastAPI's Depends()
+   - Proper error handling with HTTPException
+   - Pydantic models for request/response validation
+
+**Files Created**:
+- `src/database/query_logger.py` - Query logging system (544 lines)
+- `src/api/dependencies.py` - Dependency injection (127 lines)
+
+**Files Modified**:
+- `src/api/main.py` - Added service initialization in lifespan
+- `src/api/routes/documents.py` - Full implementation with DI
+- `src/api/routes/search.py` - Full implementation with DI
+- `src/api/routes/health.py` - Enhanced with real service checks
+- `tests/integration/test_api_basic.py` - Added proper mocking
+
+**Immediate Priorities for Next Session**:
+
+1. **Phase 3: Implement FastAgent Agents** (GitHub Issue #23) - CRITICAL PATH:
+   - Setup FastAgent with Ollama generic provider
+   - Implement retrieval agent (RAG) for vector search
+   - Implement orchestrator agent for routing
+   - Implement analyst and web search agents
+   - This unblocks remaining Phase 2 TODOs (chat endpoint)
+
+2. **Reach 90% Test Coverage** (0.84% to go):
+   - Add error path tests for API routes
+   - Add edge case tests for dependencies module
+   - Focus on uncovered lines in api/routes/
+
+3. **Update Phase 2 Issue Status** (GitHub Issue #22):
+   - Mark as 95% complete
+   - Document remaining TODOs (blocked by Phase 3)
+
 ### 7. Next Development Tasks (Updated Nov 10, 2025 - Session 4)
 
 **Session 4 Completed Tasks** ✅:

@@ -14,7 +14,10 @@
       "Bash(gh issue comment:*)",
       "Bash(gh issue list:*)",
       "Bash(gh issue close:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(pip install:*)",
+      "Bash(=0.19.0)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

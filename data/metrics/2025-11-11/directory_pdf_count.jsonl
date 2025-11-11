@@ -1,0 +1,3 @@
+{"name": "directory_pdf_count", "value": 3, "type": "gauge", "timestamp": 1762858651.4846342, "labels": {"directory": "C:\\Users\\doodl\\AppData\\Local\\Temp\\pytest-of-doodl\\pytest-45\\test_process_directory0\\pdfs", "recursive": "True"}}
+{"name": "directory_pdf_count", "value": 3, "type": "gauge", "timestamp": 1762858651.5901906, "labels": {"directory": "C:\\Users\\doodl\\AppData\\Local\\Temp\\pytest-of-doodl\\pytest-45\\test_batched_processing0\\pdfs", "recursive": "True"}}
+{"name": "directory_pdf_count", "value": 1, "type": "gauge", "timestamp": 1762858708.4508116, "labels": {"directory": "C:\\Users\\doodl\\AppData\\Local\\Temp\\pytest-of-doodl\\pytest-45\\test_orchestrator_recovery0\\pdfs", "recursive": "True"}}

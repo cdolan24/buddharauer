@@ -1,0 +1,14 @@
+{"name": "pipeline_total_chunks", "value": 1, "type": "counter", "timestamp": 1762858651.4179654, "labels": {}}
+{"name": "pipeline_total_chunks", "value": 1, "type": "counter", "timestamp": 1762858651.4994938, "labels": {}}
+{"name": "pipeline_total_chunks", "value": 2, "type": "counter", "timestamp": 1762858651.5181708, "labels": {}}
+{"name": "pipeline_total_chunks", "value": 3, "type": "counter", "timestamp": 1762858651.5388494, "labels": {}}
+{"name": "pipeline_total_chunks", "value": 3, "type": "counter", "timestamp": 1762858651.543944, "labels": {}}
+{"name": "pipeline_total_chunks", "value": 0, "type": "counter", "timestamp": 1762858651.5611115, "labels": {}}
+{"name": "pipeline_total_chunks", "value": 1, "type": "counter", "timestamp": 1762858651.605053, "labels": {}}
+{"name": "pipeline_total_chunks", "value": 2, "type": "counter", "timestamp": 1762858651.6239727, "labels": {}}
+{"name": "pipeline_total_chunks", "value": 3, "type": "counter", "timestamp": 1762858651.644228, "labels": {}}
+{"name": "pipeline_total_chunks", "value": 3, "type": "counter", "timestamp": 1762858651.648807, "labels": {}}
+{"name": "pipeline_total_chunks", "value": 1, "type": "counter", "timestamp": 1762858708.4474962, "labels": {}}
+{"name": "pipeline_total_chunks", "value": 1, "type": "counter", "timestamp": 1762858708.4528143, "labels": {}}
+{"name": "pipeline_total_chunks", "value": 1, "type": "counter", "timestamp": 1762858708.4653502, "labels": {}}
+{"name": "pipeline_total_chunks", "value": 1, "type": "counter", "timestamp": 1762858714.4973338, "labels": {}}

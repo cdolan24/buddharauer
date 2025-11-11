@@ -44,6 +44,9 @@ from src.api.models.responses import SearchResponse, SearchResult, ErrorResponse
 from src.database.vector_store import VectorStore
 from src.utils.logging import get_logger
 
+# Import dependency injection functions
+from src.api.dependencies import get_vector_store, get_document_registry
+
 logger = get_logger(__name__)
 
 # Create router for search endpoints
@@ -58,7 +61,11 @@ router = APIRouter(
 
 
 @router.post("", response_model=SearchResponse, status_code=200)
-async def search_documents(request: SearchRequest):
+async def search_documents(
+    request: SearchRequest,
+    vector_store = Depends(get_vector_store),
+    registry = Depends(get_document_registry)
+):
     """
     Perform semantic search across indexed documents.
 
@@ -67,6 +74,8 @@ async def search_documents(request: SearchRequest):
 
     Args:
         request: SearchRequest containing query, filters, and options
+        vector_store: VectorStore instance (injected dependency)
+        registry: DocumentRegistry instance (injected dependency)
 
     Returns:
         SearchResponse: Search results with metadata and timing info
@@ -113,11 +122,7 @@ async def search_documents(request: SearchRequest):
     start_time = time.time()
 
     try:
-        # TODO: Get VectorStore instance from app state (dependency injection)
-        # For now, this will be a placeholder that returns an error
-        # Once DI is set up, this will use the actual vector store
-
-        # Validate query
+        # Validate query text
         if not request.query or not request.query.strip():
             raise HTTPException(
                 status_code=400,
@@ -128,19 +133,47 @@ async def search_documents(request: SearchRequest):
                 ).model_dump()
             )
 
-        # TODO: Perform actual search once VectorStore is available via DI
-        # For now, return a placeholder response
-        logger.warning(
-            "Search endpoint called but VectorStore not yet integrated. "
-            "Returning empty results."
+        logger.info(f"Searching for: '{request.query}' with limit={request.limit}")
+
+        # Perform semantic search using VectorStore
+        # The VectorStore.search() method returns results with similarity scores
+        search_results = await vector_store.search(
+            query_texts=[request.query],
+            n_results=request.limit or 10,
+            where=request.filters  # Apply metadata filters if provided
         )
+
+        # Convert VectorStore results to SearchResult format
+        results = []
+        for result in search_results:
+            # Extract document metadata for enrichment
+            doc_id = result.get("metadata", {}).get("document_id")
+            doc_title = None
+
+            # Optionally enrich with document title from registry
+            if doc_id and request.include_metadata:
+                doc_record = await registry.get_by_id(doc_id)
+                if doc_record:
+                    doc_title = doc_record.filename
+
+            results.append(SearchResult(
+                chunk_id=result.get("id", ""),
+                text=result.get("text", ""),
+                score=result.get("score", 0.0),
+                document_id=doc_id,
+                document_title=doc_title,
+                page=result.get("metadata", {}).get("page"),
+                metadata=result.get("metadata", {}) if request.include_metadata else None
+            ))
 
         processing_time_ms = (time.time() - start_time) * 1000
 
+        logger.info(f"Search completed: {len(results)} results in {processing_time_ms:.2f}ms")
+
         return SearchResponse(
-            results=[],
+            results=results,
             query=request.query,
-            total_results=0,
+            total_results=len(results),
             processing_time_ms=processing_time_ms
         )
 

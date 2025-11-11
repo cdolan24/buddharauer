@@ -20,10 +20,26 @@ Note:
 
 import pytest
 from fastapi.testclient import TestClient
+from unittest.mock import Mock, AsyncMock
 from src.api.main import app
+from src.api import dependencies
 
 # Create test client
-client = TestClient(app)
+client = TestClient(app, raise_server_exceptions=True)
+
+# Create mock services for dependency injection
+mock_vector_store = Mock()
+mock_vector_store.get_collection_stats = Mock(return_value={"document_count": 42})
+mock_vector_store.search = AsyncMock(return_value=[])  # Default: no search results
+
+mock_document_registry = AsyncMock()
+mock_document_registry.get_by_id = AsyncMock(return_value=None)  # Default: document not found
+mock_document_registry.list_all = AsyncMock(return_value=[])  # Default: no documents
+mock_document_registry.get_by_status = AsyncMock(return_value=[])  # Default: no documents
+
+# Override dependencies to use mocks
+app.dependency_overrides[dependencies.get_vector_store] = lambda: mock_vector_store
+app.dependency_overrides[dependencies.get_document_registry] = lambda: mock_document_registry
 
 
 class TestRootEndpoint:

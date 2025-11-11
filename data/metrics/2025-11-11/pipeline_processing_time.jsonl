@@ -1,0 +1,14 @@
+{"name": "pipeline_processing_time", "value": 0.0, "type": "gauge", "timestamp": 1762858651.4179673, "labels": {}}
+{"name": "pipeline_processing_time", "value": 0.0, "type": "gauge", "timestamp": 1762858651.4994965, "labels": {}}
+{"name": "pipeline_processing_time", "value": 0.0, "type": "gauge", "timestamp": 1762858651.5181727, "labels": {}}
+{"name": "pipeline_processing_time", "value": 0.0, "type": "gauge", "timestamp": 1762858651.538851, "labels": {}}
+{"name": "pipeline_processing_time", "value": 0.10747647285461426, "type": "gauge", "timestamp": 1762858651.5439453, "labels": {}}
+{"name": "pipeline_processing_time", "value": 0.0, "type": "gauge", "timestamp": 1762858651.5611129, "labels": {}}
+{"name": "pipeline_processing_time", "value": 0.0, "type": "gauge", "timestamp": 1762858651.6050546, "labels": {}}
+{"name": "pipeline_processing_time", "value": 0.0, "type": "gauge", "timestamp": 1762858651.623974, "labels": {}}
+{"name": "pipeline_processing_time", "value": 0.0, "type": "gauge", "timestamp": 1762858651.6442294, "labels": {}}
+{"name": "pipeline_processing_time", "value": 0.07416868209838867, "type": "gauge", "timestamp": 1762858651.6488085, "labels": {}}
+{"name": "pipeline_processing_time", "value": 0.0, "type": "gauge", "timestamp": 1762858708.4474978, "labels": {}}
+{"name": "pipeline_processing_time", "value": 0.02635788917541504, "type": "gauge", "timestamp": 1762858708.4528155, "labels": {}}
+{"name": "pipeline_processing_time", "value": 0.0, "type": "gauge", "timestamp": 1762858708.4653516, "labels": {}}
+{"name": "pipeline_processing_time", "value": 0.0, "type": "gauge", "timestamp": 1762858714.497336, "labels": {}}

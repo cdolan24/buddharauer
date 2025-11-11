@@ -1,0 +1,14 @@
+{"name": "pipeline_success_rate", "value": 1.0, "type": "gauge", "timestamp": 1762858651.4179702, "labels": {}}
+{"name": "pipeline_success_rate", "value": 0.3333333333333333, "type": "gauge", "timestamp": 1762858651.4994998, "labels": {}}
+{"name": "pipeline_success_rate", "value": 0.6666666666666666, "type": "gauge", "timestamp": 1762858651.518175, "labels": {}}
+{"name": "pipeline_success_rate", "value": 1.0, "type": "gauge", "timestamp": 1762858651.5388534, "labels": {}}
+{"name": "pipeline_success_rate", "value": 1.0, "type": "gauge", "timestamp": 1762858651.5439475, "labels": {}}
+{"name": "pipeline_success_rate", "value": 0.0, "type": "gauge", "timestamp": 1762858651.561115, "labels": {}}
+{"name": "pipeline_success_rate", "value": 0.3333333333333333, "type": "gauge", "timestamp": 1762858651.6050572, "labels": {}}
+{"name": "pipeline_success_rate", "value": 0.6666666666666666, "type": "gauge", "timestamp": 1762858651.6239767, "labels": {}}
+{"name": "pipeline_success_rate", "value": 1.0, "type": "gauge", "timestamp": 1762858651.644232, "labels": {}}
+{"name": "pipeline_success_rate", "value": 1.0, "type": "gauge", "timestamp": 1762858651.6488101, "labels": {}}
+{"name": "pipeline_success_rate", "value": 1.0, "type": "gauge", "timestamp": 1762858708.4474998, "labels": {}}
+{"name": "pipeline_success_rate", "value": 1.0, "type": "gauge", "timestamp": 1762858708.452818, "labels": {}}
+{"name": "pipeline_success_rate", "value": 1.0, "type": "gauge", "timestamp": 1762858708.465354, "labels": {}}
+{"name": "pipeline_success_rate", "value": 1.0, "type": "gauge", "timestamp": 1762858714.497338, "labels": {}}

@@ -1,0 +1,14 @@
+{"name": "pipeline_total_files", "value": 0, "type": "gauge", "timestamp": 1762858651.4179614, "labels": {}}
+{"name": "pipeline_total_files", "value": 3, "type": "gauge", "timestamp": 1762858651.4994898, "labels": {}}
+{"name": "pipeline_total_files", "value": 3, "type": "gauge", "timestamp": 1762858651.5181682, "labels": {}}
+{"name": "pipeline_total_files", "value": 3, "type": "gauge", "timestamp": 1762858651.5388465, "labels": {}}
+{"name": "pipeline_total_files", "value": 3, "type": "gauge", "timestamp": 1762858651.5439417, "labels": {}}
+{"name": "pipeline_total_files", "value": 0, "type": "gauge", "timestamp": 1762858651.561109, "labels": {}}
+{"name": "pipeline_total_files", "value": 3, "type": "gauge", "timestamp": 1762858651.6050498, "labels": {}}
+{"name": "pipeline_total_files", "value": 3, "type": "gauge", "timestamp": 1762858651.6239698, "labels": {}}
+{"name": "pipeline_total_files", "value": 3, "type": "gauge", "timestamp": 1762858651.6442254, "labels": {}}
+{"name": "pipeline_total_files", "value": 3, "type": "gauge", "timestamp": 1762858651.6488047, "labels": {}}
+{"name": "pipeline_total_files", "value": 0, "type": "gauge", "timestamp": 1762858708.4474933, "labels": {}}
+{"name": "pipeline_total_files", "value": 1, "type": "gauge", "timestamp": 1762858708.452812, "labels": {}}
+{"name": "pipeline_total_files", "value": 0, "type": "gauge", "timestamp": 1762858708.4653478, "labels": {}}
+{"name": "pipeline_total_files", "value": 0, "type": "gauge", "timestamp": 1762858714.4973307, "labels": {}}
