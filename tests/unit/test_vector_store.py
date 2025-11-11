@@ -158,7 +158,9 @@ async def test_search_error_cases(vector_store: VectorStore):
         query_texts=["test query"],
         where={"nonexistent": "filter"}
     )
-    assert not results["ids"]
+    # ChromaDB API returns one list per query, so with 1 query we get [[]]
+    assert len(results["ids"]) == 1  # One result list
+    assert len(results["ids"][0]) == 0  # That list is empty
 
     # Add some documents and test filtering
     await vector_store.add_documents(

@@ -132,17 +132,25 @@ async def test_operation_timing(monitoring_system):
 
 def test_progress_eta_calculation(monitoring_system):
     """Test ETA calculation in progress tracking."""
-    # Simulate start of operation
+    # Simulate start of operation - start tracker at time t=0
     start_time = time.time()
-    
-    # Update progress after 1 second (simulated)
+
+    # First update at start_time to create the tracker
+    with patch('time.time', return_value=start_time):
+        monitoring_system.update_progress(
+            operation="test_op",
+            completed=0,
+            total=20
+        )
+
+    # Second update after 1 second (simulated) with 5 items completed
     with patch('time.time', return_value=start_time + 1.0):
         monitoring_system.update_progress(
             operation="test_op",
             completed=5,
             total=20
         )
-        
+
         progress = monitoring_system.get_progress("test_op")
         assert progress.eta is not None
         # With 5 items in 1 second, remaining 15 should take 3 seconds

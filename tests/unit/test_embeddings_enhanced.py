@@ -55,12 +55,19 @@ async def test_successful_embedding_generation(embedding_generator):
 async def test_embedding_caching(embedding_generator):
     """Test that embeddings are properly cached and reused."""
     mock_embedding = [0.1, 0.2, 0.3]
-    text = "test text for caching enhanced"
+    # Use unique text with timestamp to avoid cache collisions from previous runs
+    import time
+    text = f"test text for caching enhanced {time.time()}"
+
+    # Clear any existing cache for this text (shouldn't exist but be safe)
+    cache_path = embedding_generator.cache._get_cache_path(text)
+    if cache_path.exists():
+        cache_path.unlink()
 
     # Create an async mock for the post method
     mock_response = mock_api_response(embedding=mock_embedding)
 
-    # First call - should hit API
+    # First call - should hit API (cache miss)
     with patch('httpx.AsyncClient') as mock_client:
         mock_instance = AsyncMock()
         mock_instance.post = AsyncMock(return_value=mock_response)
@@ -186,7 +193,17 @@ async def test_progress_tracking(embedding_generator):
     progress_calls = []
     embedding_generator.progress_callback = lambda c, t: progress_calls.append((c, t))
 
-    texts = ["text1 progress", "text2 progress", "text3 progress"]
+    # Use unique texts with timestamp to ensure cache misses
+    import time
+    timestamp = time.time()
+    texts = [f"text1 progress {timestamp}", f"text2 progress {timestamp}", f"text3 progress {timestamp}"]
+
+    # Clear cache for these texts
+    for text in texts:
+        cache_path = embedding_generator.cache._get_cache_path(text)
+        if cache_path.exists():
+            cache_path.unlink()
+
     mock_embedding = [0.1, 0.2, 0.3]
 
     with patch('httpx.AsyncClient') as mock_client:

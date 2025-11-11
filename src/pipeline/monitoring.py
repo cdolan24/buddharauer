@@ -222,9 +222,14 @@ class MonitoringSystem:
         # Calculate ETA
         if completed > 0:
             elapsed = time.time() - tracker.started_at
-            items_per_sec = completed / elapsed
-            remaining_items = total - completed
-            tracker.eta = time.time() + (remaining_items / items_per_sec)
+            # Avoid division by zero if operation completes instantly
+            if elapsed > 0:
+                items_per_sec = completed / elapsed
+                remaining_items = total - completed
+                tracker.eta = time.time() + (remaining_items / items_per_sec)
+            else:
+                # If elapsed time is 0, set ETA to None (too fast to measure)
+                tracker.eta = None
             
         # Update status
         if completed >= total:
