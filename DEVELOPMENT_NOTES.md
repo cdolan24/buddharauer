@@ -100,7 +100,39 @@ except SpecificError as e:
    - Tests run in strict mode
    - Cache affects test isolation
 
-### 6. Completed Since Last Update (Nov 10, 2025 - Session 2)
+### 6. Completed Since Last Update
+
+#### Session 3 (Nov 10, 2025) - Test Fixes ✅
+
+**Fixed 7 failing tests (84% → 96% passing)**:
+
+1. **Embeddings Tests (2 fixed)**:
+   - `test_embedding_caching`: Fixed cache collision issues with unique timestamped text
+   - `test_progress_tracking`: Ensured cache misses to trigger API calls
+
+2. **PDF Error Handling Tests (5 fixed)**:
+   - `test_encrypted_pdf`: Updated for retry decorator behavior
+   - `test_invalid_pdf`: Updated for retry decorator behavior
+   - `test_extraction_timeout`: Fixed time.time() mocking (6 calls for retry loop)
+   - `test_retry_logic`: Rewrote to test decorator directly
+   - `test_directory_processing_with_errors`: Added all PDFMetadata fields
+
+3. **Monitoring Test (1 fixed)**:
+   - `test_progress_eta_calculation`: Fixed division-by-zero bug
+
+4. **Vector Store Test (1 fixed)**:
+   - `test_search_error_cases`: Fixed for ChromaDB API behavior
+
+**Code Changes**:
+- `src/pipeline/monitoring.py`: Added guard clause for elapsed=0 in ETA calculation
+
+**Key Learnings**:
+- Cache persistence between test runs can cause issues - use unique test data
+- Retry decorators wrap exceptions - tests must expect wrapped exception types
+- ChromaDB API returns `[[]]` for empty results, not `[]`
+- Time mocking needs careful planning for retry loops
+
+#### Session 2 (Nov 10, 2025) - API Enhancements
 
 1. **PDF Extractor API Improvements** (✓):
    - Enhanced `extract_metadata()` to accept both Path and Document objects
@@ -135,27 +167,28 @@ except SpecificError as e:
    - Added document storage and search
    - ChromaDB-compatible API for future migration
 
-### 7. Next Development Tasks (Updated Nov 10, 2025 - Session 2)
+### 7. Next Development Tasks (Updated Nov 10, 2025 - Session 3)
 
 **Immediate Priorities**:
 
-1. **Fix Remaining Test Failures** (High Priority):
-   - Orchestrator tests: Mock PDF creation needs real PDF files or better mocking
-   - PDF error tests: Need to create actual malformed PDFs or improve mocking strategy
-   - Recovery tests: Fix state management test failures
-   - Monitoring tests: Fix ETA calculation edge case (divide by zero)
-   - Vector store: Fix search error case test
+1. **Fix Last 3 Test Failures** (High Priority):
+   - `test_orchestrator.py::test_process_pdf` - Assertion failure
+   - `test_orchestrator.py::test_batched_processing` - No results produced
+   - `test_recovery.py::test_orchestrator_recovery` - Retry count mismatch
 
-   Current Status: 57/75 tests passing (76%)
+   These tests likely need:
+   - Proper PDF test fixtures (real minimal PDF files)
+   - Better understanding of orchestrator's actual behavior
+   - Review of recovery system's retry counting logic
+
+   Current Status: 72/75 tests passing (96%) ✅ Up from 63/75 (84%)
 
 2. **Improve Test Coverage** (High Priority):
-   - Current overall coverage: ~88% (target: >90%)
+   - Current overall coverage: 87.43% (target: >90%)
    - Focus areas:
-     - Orchestrator module: 0% coverage (needs tests)
-     - Recovery module: 0% coverage (needs tests)
-     - Monitoring module: 0% coverage (needs tests)
-     - PDF extractor: 59% coverage (improve to 90%)
-     - Embeddings cache: 76% coverage (improve to 90%)
+     - Embeddings module: 55% coverage (needs error path tests)
+     - Orchestrator module: Low coverage (needs more tests)
+     - Recovery module: Needs edge case tests
 
 3. **Code Cleanup** (Medium Priority):
    - Remove redundant code in test files

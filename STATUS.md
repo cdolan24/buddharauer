@@ -1,6 +1,6 @@
 # Buddharauer V2 - Project Status
 
-**Last Updated**: November 10, 2025
+**Last Updated**: November 10, 2025 (Session 3)
 **Current Phase**: Phase 1 - Document Processing Pipeline (In Progress)
 
 ---
@@ -9,10 +9,10 @@
 
 | Metric | Status | Target |
 |--------|--------|--------|
-| **Tests Passing** | 63/75 (84%) | 100% |
+| **Tests Passing** | 72/75 (96%) | 100% |
 | **Code Coverage** | 87.43% | 90%+ |
 | **Current Phase** | Phase 1 | Phase 0 ✅ |
-| **Next Milestone** | Fix failing tests | Complete Phase 1 |
+| **Next Milestone** | Fix last 3 tests | Complete Phase 1 |
 
 ---
 
@@ -45,31 +45,20 @@
 
 ## What's Not Working ⚠️
 
-### Test Failures (12 tests)
+### Test Failures (3 tests remaining)
 
-#### 1. PDF Error Handling Tests (5 failures)
-**Files**: `tests/unit/test_pdf_errors.py`
-**Issue**: Tests create fake PDFs that aren't valid PyMuPDF documents
-**Impact**: Medium - Core functionality works, tests need better fixtures
-**Issue**: [#17](https://github.com/cdolan24/buddharauer/issues/17)
-
-#### 2. Orchestrator Tests (2 failures)
+#### 1. Orchestrator Tests (2 failures)
 **Files**: `tests/unit/test_orchestrator.py`
-**Issue**: Same as above - invalid test PDFs
-**Impact**: Medium - Orchestrator works with real PDFs
-**Issue**: [#17](https://github.com/cdolan24/buddharauer/issues/17)
+- `test_process_pdf`: Assertion failure (`assert False`)
+- `test_batched_processing`: No results produced (`assert 0 > 0`)
+**Impact**: Medium - These tests need proper PDF mocking or real test files
+**Status**: Needs investigation
 
-#### 3. Embeddings Enhanced Tests (2 failures)
-**Files**: `tests/unit/test_embeddings_enhanced.py`
-**Issue**: Mock not capturing API calls due to cache interference
-**Impact**: Low - Basic embedding tests pass, just mock issues
-**Issue**: [#17](https://github.com/cdolan24/buddharauer/issues/17)
-
-#### 4. Other (3 failures)
-- Monitoring ETA calculation (division by zero edge case)
-- Recovery state management (assertion mismatch)
-- Vector store error cases (error not raising)
-**Issue**: [#17](https://github.com/cdolan24/buddharauer/issues/17)
+#### 2. Recovery Test (1 failure)
+**Files**: `tests/unit/test_recovery.py`
+- `test_orchestrator_recovery`: Retry count mismatch (`assert 0 == 1`)
+**Impact**: Low - Recovery system works, test expectations may be incorrect
+**Status**: Needs investigation
 
 ### Coverage Gaps
 - embeddings.py: 55% (missing error path tests)
@@ -78,7 +67,34 @@
 
 ---
 
-## Recent Accomplishments (Nov 10, 2025)
+## Recent Accomplishments (Nov 10, 2025 - Session 3)
+
+### Test Fixes (7 tests fixed - 84% → 96% passing)
+
+1. **Embeddings Tests Fixed (2)**
+   - `test_embedding_caching`: Added cache clearing and unique timestamped text to prevent collisions
+   - `test_progress_tracking`: Used unique texts to ensure cache misses and trigger API calls
+
+2. **PDF Error Handling Tests Fixed (5)**
+   - `test_encrypted_pdf`: Updated to expect `PDFExtractionError` (wrapped by retry decorator)
+   - `test_invalid_pdf`: Updated to expect `PDFExtractionError` (wrapped by retry decorator)
+   - `test_extraction_timeout`: Fixed time.time() mocking for retry loop (6 calls needed)
+   - `test_retry_logic`: Rewrote to directly test `retry_on_error` decorator
+   - `test_directory_processing_with_errors`: Added all required PDFMetadata fields
+
+3. **Monitoring Test Fixed (1)**
+   - `test_progress_eta_calculation`: Fixed division-by-zero bug in ETA calculation
+
+4. **Vector Store Test Fixed (1)**
+   - `test_search_error_cases`: Fixed assertion to match ChromaDB API behavior (`[[]]` not `[]`)
+
+### Code Improvements
+
+1. **[src/pipeline/monitoring.py](src/pipeline/monitoring.py:226-232)**
+   - Added guard clause to prevent division by zero when elapsed time is 0
+   - Sets ETA to `None` for operations that complete instantly
+
+## Previous Accomplishments (Nov 10, 2025 - Session 2)
 
 ### Code Improvements
 1. **Enhanced PDF Extractor API**
@@ -177,15 +193,21 @@
 
 ## Next Steps (Priority Order)
 
-### Immediate (This Week)
-1. **Fix failing tests** - Get to 75/75 passing
-   - Create proper malformed PDF fixtures
-   - Fix mock issues in embeddings tests
-   - Fix edge cases (division by zero, etc.)
+### Immediate (Next Session)
+1. **Fix last 3 failing tests** - Get to 75/75 passing (100%)
+   - `test_orchestrator.py::test_process_pdf`
+   - `test_orchestrator.py::test_batched_processing`
+   - `test_recovery.py::test_orchestrator_recovery`
+   - These likely need proper PDF test fixtures or better mocking
 
-2. **Increase coverage to 90%+**
-   - Add tests for embeddings error paths
-   - Add orchestrator edge case tests
+2. **Code cleanup and documentation**
+   - Add comments to uncommented code
+   - Remove redundant/duplicate code
+   - Ensure all functions have proper docstrings
+
+3. **Increase coverage to 90%+**
+   - Add tests for embeddings error paths (currently 55%)
+   - Improve orchestrator test coverage (currently 0%)
    - Complete vector store error tests
 
 ### Short Term (Next Week)
