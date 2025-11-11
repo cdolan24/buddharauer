@@ -22,7 +22,9 @@
       "Bash(dir:*)",
       "Bash(curl:*)",
       "Bash(ollama pull:*)",
-      "Bash(.gitignore)"
+      "Bash(.gitignore)",
+      "Bash(ollama list:*)",
+      "Bash(pytest:*)"
     ],
     "deny": [],
     "ask": []
