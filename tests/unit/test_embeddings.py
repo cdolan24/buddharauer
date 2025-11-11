@@ -57,12 +57,15 @@ async def test_batch_embedding_generation(embedding_generator):
         "Second test text",
         "Third test text"
     ]
-    
+
+    # Returns a dictionary mapping texts to embeddings
     embeddings = await embedding_generator.batch_generate_embeddings(texts)
-    
+
+    assert isinstance(embeddings, dict)
     assert len(embeddings) == len(texts)
-    assert all(isinstance(emb, list) for emb in embeddings)
-    assert all(isinstance(x, float) for emb in embeddings for x in emb)
+    assert all(text in embeddings for text in texts)
+    assert all(isinstance(embeddings[text], list) for text in texts)
+    assert all(isinstance(x, float) for text in texts for x in embeddings[text])
 
 
 def test_cache_directory_creation(tmp_path):

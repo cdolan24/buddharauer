@@ -28,14 +28,14 @@ class EmbeddingTimeoutError(EmbeddingError):
 class EmbeddingGenerator:
     """Generate embeddings using Ollama's nomic-embed-text model."""
 
-    def __init__(self, 
+    def __init__(self,
                 cache_dir: str | Path = "data/cache/embeddings",
                 batch_size: int = 50,
                 max_retries: int = 3,
                 timeout: float = 30.0,
                 progress_callback: Optional[Callable[[int, int], None]] = None):
         """Initialize the embedding generator.
-        
+
         Args:
             cache_dir: Directory to store embedding cache files
             batch_size: Number of texts to process in parallel
@@ -50,6 +50,15 @@ class EmbeddingGenerator:
         self.timeout = timeout
         self.progress_callback = progress_callback
         self.cache = EmbeddingsCache(cache_dir)
+
+    @property
+    def cache_dir(self) -> Path:
+        """Get the cache directory path.
+
+        Returns:
+            Path to the cache directory
+        """
+        return self.cache.cache_dir
         
     async def _generate_single(self, 
                            text: str, 
@@ -84,7 +93,7 @@ class EmbeddingGenerator:
                     
                 return result["embedding"]
                 
-        except httpx.TimeoutError:
+        except httpx.TimeoutException:
             if retry_count < self.max_retries:
                 await asyncio.sleep(2 ** retry_count)  # Exponential backoff
                 return await self._generate_single(text, retry_count + 1)

@@ -1,0 +1,1 @@
+{"operation_id": "process_pdf_1762822392", "start_time": 1762822392.6403754, "operation_type": "process_pdf", "input_data": {"pdf_path": "C:\\Users\\doodl\\AppData\\Local\\Temp\\pytest-of-doodl\\pytest-4\\test_batched_processing0\\pdfs\\test2.pdf"}, "status": "failed", "error": "'WindowsPath' object has no attribute 'metadata'", "retry_count": 0}
