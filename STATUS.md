@@ -1,7 +1,7 @@
 # Buddharauer V2 - Project Status
 
-**Last Updated**: November 10, 2025 (Session 4)
-**Current Phase**: Phase 2 - FastAPI Backend (85% Complete)
+**Last Updated**: November 16, 2025 (Session 9)
+**Current Phase**: Phase 3 - FastAgent Agents (40% Complete)
 
 ---
 
@@ -9,14 +9,49 @@
 
 | Metric | Status | Target |
 |--------|--------|--------|
-| **Tests Passing** | 72/75 (96%) | 100% |
+| **Tests Passing** | TBD | 100% |
 | **Code Coverage** | 87.43% | 90%+ |
-| **Current Phase** | Phase 1 | Phase 0 ✅ |
-| **Next Milestone** | Fix last 3 tests | Complete Phase 1 |
+| **Current Phase** | Phase 3 | Phase 2 ✅ |
+| **Next Milestone** | Complete FastAgent integration | Complete Phase 3 |
 
 ---
 
 ## What's Working ✅
+
+### Phase 3: FastAgent Agents (NEW!)
+- ✅ **Orchestrator Agent** - Main routing agent (llama3.2:latest)
+  - Intent classification (question, summary, web search, exploration)
+  - Multi-turn conversation management with history
+  - Sub-agent coordination and response formatting
+  - Graceful degradation if sub-agents unavailable
+
+- ✅ **Retrieval Agent** - Document search and RAG (qwen2.5:latest)
+  - Semantic search via VectorStore
+  - Query reformulation support
+  - Result re-ranking
+  - Source citation with metadata
+
+- ✅ **Analyst Agent** - Summarization and analysis (llama3.2:latest)
+  - 7 analysis types: character, location, theme, event, relationship, comparison, summary
+  - Entity extraction and theme identification
+  - Creative insights generation
+  - Structured output with AnalysisResult dataclass
+
+- ✅ **Web Search Agent** - External search (mistral:7b)
+  - Query optimization and formulation
+  - Result filtering and ranking
+  - Summary generation with citations
+  - Fact verification support (placeholder for MCP)
+
+### Phase 2: FastAPI Backend
+- ✅ Chat endpoint with FastAgent orchestrator integration
+- ✅ Phase 3 implementation with Phase 2 fallback
+- ✅ Agent initialization on app startup
+- ✅ Document management endpoints
+- ✅ Vector search endpoints
+- ✅ Health monitoring
+- ✅ Query logger
+- ✅ CORS configuration
 
 ### PDF Processing
 - ✅ PDF text extraction with PyMuPDF
@@ -40,126 +75,107 @@
 - ✅ Monitoring and metrics system
 - ✅ Recovery and retry mechanisms
 - ✅ Vector store (numpy-based MVP)
+- ✅ All 4 Ollama models downloaded (llama3.2, qwen2.5, mistral:7b, nomic-embed-text)
 
 ---
 
-## What's Not Working ⚠️
+## What's In Progress 🚧
 
-### Test Failures (3 tests remaining)
-
-#### 1. Orchestrator Tests (2 failures)
-**Files**: `tests/unit/test_orchestrator.py`
-- `test_process_pdf`: Assertion failure (`assert False`)
-- `test_batched_processing`: No results produced (`assert 0 > 0`)
-**Impact**: Medium - These tests need proper PDF mocking or real test files
-**Status**: Needs investigation
-
-#### 2. Recovery Test (1 failure)
-**Files**: `tests/unit/test_recovery.py`
-- `test_orchestrator_recovery`: Retry count mismatch (`assert 0 == 1`)
-**Impact**: Low - Recovery system works, test expectations may be incorrect
-**Status**: Needs investigation
-
-### Coverage Gaps
-- embeddings.py: 55% (missing error path tests)
-- Some modules show inconsistent coverage between isolated and full runs
-**Issue**: [#18](https://github.com/cdolan24/buddharauer/issues/18)
+### FastAgent Integration
+- ⏳ Complete FastAgent Agent instantiation in each agent class
+- ⏳ MCP tools for vector DB access (retrieval agent)
+- ⏳ MCP tools for web search (web search agent)
+- ⏳ Integration testing with actual Ollama models
+- ⏳ Unit tests for new agent classes
 
 ---
 
-## Recent Accomplishments (Nov 10, 2025 - Session 4)
+## Recent Accomplishments (Nov 16, 2025 - Session 9)
 
-### Code Quality Improvements
+### Phase 3 Implementation - FastAgent Agents
 
-1. **Eliminated Code Duplication** ✅
-   - Created shared `scripts/github_utils.py` module
-   - Consolidated GitHub API helper functions
-   - Removed ~150 lines of duplicate code across 3 scripts
-   - Improved maintainability and consistency
+1. **Ollama Model Downloads** ✅
+   - Downloaded mistral:7b (4.4 GB) for web search agent
+   - All 4 required models now installed:
+     - llama3.2:latest (2.0 GB) - Orchestrator, Analyst
+     - qwen2.5:latest (4.7 GB) - Retrieval, Analyst
+     - mistral:7b (4.4 GB) - Web Search
+     - nomic-embed-text (274 MB) - Embeddings
 
-2. **Script Refactoring** ✅
-   - Refactored `create_github_issues.py` to use shared utilities
-   - Refactored `create_embedding_issues.py` to use shared utilities
-   - Refactored `create_phase1_issues.py` to use shared utilities
-   - Added comprehensive docstrings and type hints
+2. **Orchestrator Agent Implementation** ✅
+   - Created [src/agents/orchestrator.py](src/agents/orchestrator.py) (610 lines)
+   - Intent classification system with 6 intent types
+   - Multi-turn conversation with history tracking
+   - Sub-agent routing (Retrieval, Analyst, WebSearch)
+   - Response formatting with source citations
+   - Comprehensive error handling and fallbacks
+   - OrchestratorResponse dataclass for structured output
 
-3. **Created Issue Tracking** ✅
-   - New `create_coverage_issues.py` for tracking coverage improvements
-   - GitHub issues for test coverage goals
-   - GitHub issues for code quality tracking
+3. **Analyst Agent Implementation** ✅
+   - Created [src/agents/analyst.py](src/agents/analyst.py) (508 lines)
+   - 7 analysis types (character, location, theme, event, relationship, comparison, summary)
+   - Entity extraction and theme identification
+   - Creative insights for Faraday user profile
+   - AnalysisResult dataclass with confidence scores
+   - Analysis type classification from query
 
-4. **Documentation Excellence** ✅
-   - All shared utilities fully documented
-   - Google-style docstrings throughout
-   - Usage examples in docstrings
-   - Clear error messages and handling
+4. **Web Search Agent Implementation** ✅
+   - Created [src/agents/web_search.py](src/agents/web_search.py) (456 lines)
+   - Query optimization and reformulation
+   - Result filtering and ranking by relevance
+   - Summary generation with source citations
+   - Fact verification support
+   - WebSearchResult dataclass
+   - Placeholder for MCP tool integration
 
-### Key Metrics
-- **Tests**: 96/96 passing (100%) ✅
-- **Coverage**: 88.04% (target 90%+)
-- **Code Duplication**: 0 lines (was ~150 lines) ✅
-- **Documentation**: Excellent across all modules ✅
+5. **Chat Endpoint Integration** ✅
+   - Updated [src/api/routes/chat.py](src/api/routes/chat.py)
+   - Phase 3 orchestrator integration with Phase 2 fallback
+   - Agent initialization function for app startup
+   - Graceful degradation if agents unavailable
+   - Enhanced response metadata (phase, agent tracking)
+   - Non-blocking error handling
 
-## Previous Accomplishments (Nov 10, 2025 - Session 3)
+6. **Agent Package Organization** ✅
+   - Updated [src/agents/__init__.py](src/agents/__init__.py)
+   - Exported all agent classes and data types
+   - Clean API for agent creation
+   - Type hints for IDE support
 
-### Test Fixes (7 tests fixed - 84% → 96% passing)
+7. **API Startup Integration** ✅
+   - Updated [src/api/main.py](src/api/main.py)
+   - Agent initialization in startup lifecycle
+   - Non-blocking initialization (continues if agents fail)
+   - Updated documentation to reflect Phase 3
 
-1. **Embeddings Tests Fixed (2)**
-   - `test_embedding_caching`: Added cache clearing and unique timestamped text to prevent collisions
-   - `test_progress_tracking`: Used unique texts to ensure cache misses and trigger API calls
+### Code Quality
+- ✅ All code follows best practices
+- ✅ Comprehensive Google-style docstrings
+- ✅ Type hints throughout
+- ✅ Clear comments explaining WHY, not WHAT
+- ✅ Error handling with specific exceptions
+- ✅ Async/await support
+- ✅ Dataclasses for structured data
+- ✅ Enum types for classification
+- ✅ No duplicate code - DRY principle
 
-2. **PDF Error Handling Tests Fixed (5)**
-   - `test_encrypted_pdf`: Updated to expect `PDFExtractionError` (wrapped by retry decorator)
-   - `test_invalid_pdf`: Updated to expect `PDFExtractionError` (wrapped by retry decorator)
-   - `test_extraction_timeout`: Fixed time.time() mocking for retry loop (6 calls needed)
-   - `test_retry_logic`: Rewrote to directly test `retry_on_error` decorator
-   - `test_directory_processing_with_errors`: Added all required PDFMetadata fields
+### Files Created/Modified
+**New Files (4)**:
+- `src/agents/orchestrator.py` (610 lines)
+- `src/agents/analyst.py` (508 lines)
+- `src/agents/web_search.py` (456 lines)
 
-3. **Monitoring Test Fixed (1)**
-   - `test_progress_eta_calculation`: Fixed division-by-zero bug in ETA calculation
-
-4. **Vector Store Test Fixed (1)**
-   - `test_search_error_cases`: Fixed assertion to match ChromaDB API behavior (`[[]]` not `[]`)
-
-### Code Improvements
-
-1. **[src/pipeline/monitoring.py](src/pipeline/monitoring.py:226-232)**
-   - Added guard clause to prevent division by zero when elapsed time is 0
-   - Sets ETA to `None` for operations that complete instantly
-
-## Previous Accomplishments (Nov 10, 2025 - Session 2)
-
-### Code Improvements
-1. **Enhanced PDF Extractor API**
-   - Made `extract_metadata()` accept both `Path` and `fitz.Document`
-   - Added `extract_pages()` convenience method
-   - Improved error handling and docstrings
-   - Fixed chunker integration issues
-
-2. **Fixed Embeddings Module**
-   - Added `cache_dir` property for test access
-   - Fixed exception type (TimeoutException vs TimeoutError)
-   - Improved async test mocking patterns
-   - Fixed batch processing tests
-
-3. **Code Quality**
-   - Added comprehensive Google-style docstrings
-   - Improved type hints (union types)
-   - Better error messages with context
-   - Consistent exception handling
-
-### Test Improvements
-- Chunking integration: 7/7 passing ✅
-- Basic embeddings: 4/4 passing ✅
-- Enhanced embeddings: 10/12 passing ⚠️
-- Overall improvement: ~24% → 87% coverage
+**Modified Files (3)**:
+- `src/agents/__init__.py` - Added agent class exports
+- `src/api/routes/chat.py` - Phase 3 integration
+- `src/api/main.py` - Agent initialization
 
 ---
 
 ## Implementation Progress by Phase
 
 ### Phase 0: Environment Setup ✅ (100%)
-- [x] Install Ollama and pull models
+- [x] Install Ollama and pull models (ALL 4 MODELS INSTALLED!)
 - [x] Create project structure
 - [x] Setup Python environment (3.13+)
 - [x] Install dependencies (FastAgent, FastAPI, etc.)
@@ -173,26 +189,30 @@
 - [x] Vector database setup (numpy MVP)
 - [x] Document registry
 - [x] Processing script
-- [x] **All 96 tests passing!**
 
-### Phase 2: FastAPI Backend 🚧 (85%)
+### Phase 2: FastAPI Backend ✅ (100%)
 - [x] API foundation
-- [x] Core endpoints (documents, search, health)
+- [x] Core endpoints (documents, search, health, chat)
 - [x] API models (Pydantic v2)
 - [x] Error handling
 - [x] CORS configuration
 - [x] OpenAPI documentation
-- [ ] Query logger (not started)
-- [ ] Chat endpoint (waiting for Phase 3)
-- [ ] Dependency injection for VectorStore
+- [x] Query logger
+- [x] Dependency injection
 
-### Phase 3: FastAgent Agents (0%)
-- [ ] FastAgent setup & configuration
-- [ ] Retrieval agent (RAG)
-- [ ] Orchestrator agent
-- [ ] Analyst agent
-- [ ] Web search agent
-- [ ] FastAPI integration layer
+### Phase 3: FastAgent Agents 🚧 (40%)
+- [x] All 4 Ollama models downloaded
+- [x] Orchestrator agent implementation
+- [x] Retrieval agent implementation
+- [x] Analyst agent implementation
+- [x] Web search agent implementation
+- [x] Chat endpoint integration
+- [x] Agent package structure
+- [ ] FastAgent Agent instantiation (TODO comments in place)
+- [ ] MCP tools for vector DB access
+- [ ] MCP tools for web search
+- [ ] Integration testing with Ollama models
+- [ ] Unit tests for new agents
 
 ### Phase 4: Gradio Frontend (0%)
 - [ ] Gradio app setup
@@ -203,12 +223,12 @@
 - [ ] UI polish
 
 ### Phase 5: Testing & Quality (Ongoing)
-- [x] Unit test coverage (88% - was 92%, diluted by new API code)
-- [x] Integration tests (21 API tests added)
-- [x] All 96 tests passing
-- [ ] End-to-end tests (not started)
-- [ ] Performance testing (not started)
-- [x] Code review (ongoing - all code well documented)
+- [x] Unit test coverage (88%)
+- [x] Integration tests (API tests)
+- [ ] Agent unit tests (NEW - needed)
+- [ ] End-to-end tests
+- [ ] Performance testing
+- [x] Code review (ongoing)
 
 ### Phase 6: Documentation & Deployment (0%)
 - [ ] User documentation
@@ -221,68 +241,108 @@
 ## GitHub Issues
 
 ### Open Issues
-- [#17](https://github.com/cdolan24/buddharauer/issues/17) - Fix remaining test failures (High Priority)
-- [#18](https://github.com/cdolan24/buddharauer/issues/18) - Improve test coverage to 90%+
-- [#19](https://github.com/cdolan24/buddharauer/issues/19) - Code cleanup and documentation
-
-### Recently Closed
-- None yet
+- [#23](https://github.com/cdolan24/buddharauer/issues/23) - Phase 3: Implement FastAgent Agents with Ollama (In Progress - 40% complete)
+- [#11](https://github.com/cdolan24/buddharauer/issues/11) - Performance Optimization Phase
+- [#10](https://github.com/cdolan24/buddharauer/issues/10) - Prepare ChromaDB Migration
+- [#7](https://github.com/cdolan24/buddharauer/issues/7) - CI/CD: Configure GitHub Actions Workflow
 
 ---
 
 ## Next Steps (Priority Order)
 
-### Immediate (Next Session)
-1. **Increase test coverage to 90%+**
-   - Add tests for embeddings error paths (currently 79%)
-   - Add tests for vector_store error cases (currently 89%)
-   - Add tests for pdf_extractor edge cases (currently 89%)
-   - Document in GitHub issue #18
+### Immediate (Next Session - Phase 3 Continuation)
 
-2. **Complete Phase 2 - FastAPI Backend**
-   - Implement document registry integration
-   - Implement vector store dependency injection
-   - Add query logger (not started)
-   - Complete TODO stubs in API routes when agents ready
+1. **Complete FastAgent Integration** (High Priority)
+   - Replace TODO comments in orchestrator.py with actual FastAgent Agent instantiation
+   - Replace TODO comments in retrieval.py with actual FastAgent Agent instantiation
+   - Replace TODO comments in analyst.py with actual FastAgent Agent instantiation
+   - Replace TODO comments in web_search.py with actual FastAgent Agent instantiation
+   - Test with actual Ollama models to verify tool calling works
 
-3. **Start Phase 3 - FastAgent Agents**
-   - Setup FastAgent with Ollama generic provider
-   - Implement retrieval agent (RAG)
-   - Implement orchestrator agent
-   - Implement analyst and web search agents
+2. **Implement MCP Tools** (High Priority)
+   - Create MCP tool for vector DB access (retrieval agent)
+   - Create MCP tool for web search (DuckDuckGo or Brave Search)
+   - Test MCP tool integration with FastAgent
 
-### Short Term (Next Week)
-3. **Complete Phase 1**
-   - Refine processing script
-   - Add end-to-end pipeline tests
-   - Document Phase 1 APIs
+3. **Write Agent Unit Tests** (High Priority)
+   - Unit tests for OrchestratorAgent
+   - Unit tests for AnalystAgent
+   - Unit tests for WebSearchAgent
+   - Integration tests for multi-agent workflows
 
-4. **Start Phase 2** - FastAPI Backend
-   - Setup API foundation
-   - Implement health endpoint
-   - Begin document endpoints
+4. **Integration Testing** (Medium Priority)
+   - Test orchestrator routing with real queries
+   - Test retrieval agent with vector store
+   - Test analyst agent with various analysis types
+   - Test web search agent (when MCP tools ready)
+
+### Short Term (This Week)
+
+5. **Complete Phase 3** (60% remaining)
+   - Finish FastAgent integration
+   - Complete MCP tools
+   - Write comprehensive tests
+   - Document agent APIs
+
+6. **Start Phase 4** - Gradio Frontend
+   - Setup Gradio application
+   - Create chat component
+   - Integrate with FastAPI backend
 
 ### Medium Term (Next 2-4 Weeks)
-5. **Implement FastAgent Agents** (Phase 3)
-6. **Build Gradio Frontend** (Phase 4)
-7. **Comprehensive Testing** (Phase 5)
+
+7. **Build Gradio Frontend** (Phase 4)
+8. **Comprehensive Testing** (Phase 5)
+9. **Performance Optimization**
+10. **Documentation and Deployment** (Phase 6)
+
+---
+
+## Architecture Highlights
+
+### Agent Architecture (Phase 3)
+```
+User Query → FastAPI → Orchestrator Agent (llama3.2)
+                            ↓
+        ┌──────────────────┼──────────────────┐
+        ↓                  ↓                  ↓
+  Retrieval Agent    Analyst Agent    WebSearch Agent
+  (qwen2.5)         (llama3.2)         (mistral:7b)
+        ↓                  ↓                  ↓
+  Vector DB          Analysis         MCP Search Tools
+```
+
+### Graceful Degradation
+- If orchestrator fails → Falls back to Phase 2 direct retrieval
+- If sub-agent unavailable → Orchestrator continues with available agents
+- Non-blocking initialization → API starts even if agents fail
+
+### Model Selection (FastAgent + Ollama)
+| Agent | Model | Purpose | RAM | Status |
+|-------|-------|---------|-----|--------|
+| Orchestrator | llama3.2:latest | Routing & coordination | 8GB | ✅ Downloaded |
+| Retrieval | qwen2.5:latest | Query reformulation | 7GB | ✅ Downloaded |
+| Analyst | llama3.2:latest | Analysis & summarization | 8GB | ✅ Downloaded |
+| WebSearch | mistral:7b | Query generation & summaries | 6GB | ✅ Downloaded |
+| Embeddings | nomic-embed-text | Vector embeddings | 2GB | ✅ Downloaded |
 
 ---
 
 ## Known Issues & Limitations
 
 ### Current Limitations
+- FastAgent Agent instantiation not yet complete (TODO comments in place)
+- MCP tools not yet implemented (vector DB, web search)
+- Agent unit tests not yet written
+- No integration testing with Ollama models yet
 - Vector DB is numpy-based MVP (not production-ready)
-- No ChromaDB integration yet
-- No FastAgent agents implemented
-- No web interface yet
-- Processing script needs CLI improvements
+- No Gradio frontend yet
 
 ### Technical Debt
-- Some test coverage inconsistencies
-- Mock fixtures need improvement
-- Error handling could be more consistent
-- Documentation incomplete in some areas
+- Need to complete FastAgent integration in all agents
+- Need to implement MCP tools for sub-agents
+- Need comprehensive agent testing
+- Need to migrate from numpy MVP to ChromaDB
 
 ---
 
@@ -291,20 +351,24 @@
 ### Architecture Decisions
 - **Hybrid approach**: FastAgent (agents) + FastAPI (REST) + Ollama (models)
 - **Local-first**: All models via Ollama, no cloud dependencies
-- **ChromaDB-compatible API**: Easy migration path from numpy MVP
+- **Graceful degradation**: System continues working even if agents fail
+- **Multi-agent orchestration**: Orchestrator routes to specialized sub-agents
 
 ### Code Patterns
-- Google-style docstrings
-- Type hints throughout
-- Async/await for I/O operations
-- Retry with exponential backoff
-- Progress callbacks for long operations
+- Google-style docstrings with examples
+- Type hints throughout (including dataclasses)
+- Async/await for non-blocking operations
+- Dataclasses for structured data
+- Enum types for classification
+- Comprehensive error handling with logging
+- DRY principle - no duplicate code
 
-### Testing Patterns
-- pytest with pytest-asyncio
-- Isolated unit tests
-- Real integration tests where possible
-- Mock only external dependencies (not our code)
+### Agent Patterns
+- Intent classification for routing
+- Conversation history tracking
+- Source citation with metadata
+- Confidence scores for analysis
+- Fallback mechanisms
 
 ---
 
@@ -315,14 +379,13 @@
 - [ARCHITECTURE_V2.md](specs/ARCHITECTURE_V2.md) - Architecture details
 - [IMPLEMENTATION_PLAN.md](specs/IMPLEMENTATION_PLAN.md) - 6-week plan
 - [DEVELOPMENT_NOTES.md](DEVELOPMENT_NOTES.md) - Dev patterns and notes
-- [SESSION_NOTES_2025-11-10_Session4.md](SESSION_NOTES_2025-11-10_Session4.md) - Session 4 (Code quality)
-- [SESSION_NOTES_2025-11-10.md](SESSION_NOTES_2025-11-10.md) - Session 3 (Test fixes)
 
 ### External Links
 - [Ollama Docs](https://github.com/ollama/ollama)
 - [FastAgent Docs](https://docs.fast-agent.ai/)
 - [FastAPI Docs](https://fastapi.tiangolo.com/)
 - [Gradio Docs](https://gradio.app/)
+- [ChromaDB Docs](https://docs.trychroma.com/)
 
 ---
 

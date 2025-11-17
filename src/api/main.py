@@ -11,8 +11,8 @@ This module sets up the FastAPI application with:
 The API provides REST endpoints for:
     - Document management (upload, list, retrieve, delete)
     - Vector search (semantic search across documents)
+    - Chat interface with FastAgent orchestrator (Phase 3)
     - System health monitoring
-    - Future: Chat interface with FastAgent agents
 
 Architecture:
     The API acts as a bridge between the web frontend (Gradio) and the
@@ -104,6 +104,22 @@ async def lifespan(app: FastAPI):
         app_state["query_logger"] = QueryLogger("data_storage/queries.db")
         await app_state["query_logger"].initialize()
         logger.info("Query logger initialized")
+
+        # Initialize FastAgent agents for Phase 3 chat functionality
+        try:
+            from src.api.routes.chat import initialize_agents
+            await initialize_agents(
+                vector_store=app_state["vector_store"],
+                document_registry=app_state["document_registry"]
+            )
+            logger.info("FastAgent orchestrator and sub-agents initialized")
+        except Exception as agent_error:
+            logger.warning(
+                f"Agent initialization failed (will use fallback): {agent_error}",
+                exc_info=True
+            )
+            # Continue startup even if agents fail to initialize
+            # The chat endpoint will fall back to Phase 2 behavior
 
         logger.info("API startup complete - all services initialized")
 

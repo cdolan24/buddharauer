@@ -24,6 +24,12 @@ Usage:
 from typing import Dict, Any, Optional
 import logging
 
+# Import agent classes
+from src.agents.orchestrator import OrchestratorAgent, IntentType, OrchestratorResponse
+from src.agents.retrieval import RetrievalAgent, SearchResult
+from src.agents.analyst import AnalystAgent, AnalysisType, AnalysisResult
+from src.agents.web_search import WebSearchAgent, WebSearchResult
+
 # Import agent factory functions from fastagent_client
 from src.utils.fastagent_client import (
     create_orchestrator_agent,
@@ -38,11 +44,25 @@ from src.utils.fastagent_client import (
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    # Agent classes
+    "OrchestratorAgent",
+    "RetrievalAgent",
+    "AnalystAgent",
+    "WebSearchAgent",
+    # Data classes
+    "IntentType",
+    "OrchestratorResponse",
+    "SearchResult",
+    "AnalysisType",
+    "AnalysisResult",
+    "WebSearchResult",
+    # Factory functions
     "create_orchestrator_agent",
     "create_retrieval_agent",
     "create_analyst_agent",
     "create_websearch_agent",
     "create_all_agents",
+    # Utilities
     "initialize_fastagent",
     "setup_fastagent",
     "FastAgentError",

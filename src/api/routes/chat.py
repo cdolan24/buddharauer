@@ -6,12 +6,12 @@ Users send messages and receive AI-generated responses with source citations.
 
 The chat endpoint:
     1. Logs the user query to QueryLogger
-    2. Performs semantic search using VectorStore
-    3. (Future) Invokes FastAgent orchestrator for intelligent response
+    2. Invokes FastAgent orchestrator for intelligent routing
+    3. Orchestrator routes to appropriate agent (Retrieval, Analyst, WebSearch)
     4. Returns formatted response with sources and metadata
 
 Architecture Flow:
-    User Message → QueryLogger → VectorStore Search → FastAgent (TODO) → Response
+    User Message → QueryLogger → Orchestrator → [Retrieval | Analyst | WebSearch] → Response
 
 Usage Example:
     POST /api/chat
@@ -26,13 +26,13 @@ Response:
         "response": "Aragorn is a ranger...",
         "sources": [...],
         "conversation_id": "session_123",
-        "agent_used": "retrieval",
+        "agent_used": ["orchestrator", "retrieval"],
         "processing_time_ms": 1234.5
     }
 """
 
 from fastapi import APIRouter, HTTPException, Depends
-from typing import List
+from typing import List, Optional
 import time
 
 from src.api.models.requests import ChatRequest
@@ -40,7 +40,17 @@ from src.api.models.responses import ChatResponse, SourceReference, ErrorRespons
 from src.api.dependencies import get_vector_store, get_document_registry, get_query_logger
 from src.utils.logging import get_logger
 
+# Import agent classes for FastAgent integration
+from src.agents import OrchestratorAgent, RetrievalAgent, AnalystAgent, WebSearchAgent
+
 logger = get_logger(__name__)
+
+# Global agent instances (initialized on startup)
+# These will be initialized by the FastAPI app startup event
+_orchestrator: Optional[OrchestratorAgent] = None
+_retrieval_agent: Optional[RetrievalAgent] = None
+_analyst_agent: Optional[AnalystAgent] = None
+_web_search_agent: Optional[WebSearchAgent] = None
 
 # Create router for chat endpoints
 router = APIRouter(
@@ -51,6 +61,78 @@ router = APIRouter(
         500: {"model": ErrorResponse, "description": "Internal server error"}
     }
 )
+
+
+async def initialize_agents(
+    vector_store,
+    document_registry
+):
+    """
+    Initialize all FastAgent agents on application startup.
+
+    This function creates and initializes the orchestrator and all sub-agents.
+    Should be called from the FastAPI startup event handler.
+
+    Args:
+        vector_store: VectorStore instance for retrieval agent
+        document_registry: DocumentRegistry instance for document metadata
+
+    Note:
+        This sets the global agent instances (_orchestrator, _retrieval_agent, etc.)
+        which are then used by the chat endpoint.
+    """
+    global _orchestrator, _retrieval_agent, _analyst_agent, _web_search_agent
+
+    try:
+        logger.info("Initializing FastAgent agents...")
+
+        # Create retrieval agent with vector store
+        _retrieval_agent = RetrievalAgent(
+            vector_store=vector_store,
+            document_registry=document_registry
+        )
+        await _retrieval_agent.initialize()
+        logger.info("✓ Retrieval agent initialized")
+
+        # Create analyst agent
+        _analyst_agent = AnalystAgent()
+        await _analyst_agent.initialize()
+        logger.info("✓ Analyst agent initialized")
+
+        # Create web search agent
+        _web_search_agent = WebSearchAgent()
+        await _web_search_agent.initialize()
+        logger.info("✓ Web search agent initialized")
+
+        # Create orchestrator with sub-agents
+        _orchestrator = OrchestratorAgent()
+        await _orchestrator.initialize(
+            retrieval_agent=_retrieval_agent,
+            analyst_agent=_analyst_agent,
+            web_search_agent=_web_search_agent
+        )
+        logger.info("✓ Orchestrator agent initialized")
+
+        logger.info("All FastAgent agents initialized successfully!")
+
+    except Exception as e:
+        logger.error(f"Failed to initialize agents: {e}", exc_info=True)
+        # Don't fail startup, but log the error
+        # Chat endpoint will fall back to basic retrieval if orchestrator is None
+
+
+def get_orchestrator() -> Optional[OrchestratorAgent]:
+    """
+    Get the global orchestrator agent instance.
+
+    Returns:
+        OrchestratorAgent instance or None if not initialized
+
+    Note:
+        If orchestrator is not available, the chat endpoint will fall back
+        to basic retrieval (Phase 2 behavior).
+    """
+    return _orchestrator
 
 
 @router.post("", response_model=ChatResponse, status_code=200)
@@ -66,18 +148,18 @@ async def chat(
     This endpoint handles multi-turn conversations with intelligent document retrieval.
     Currently uses direct vector search; will integrate FastAgent orchestrator in Phase 3.
 
-    Current Implementation (Phase 2):
+    Phase 3 Implementation (Current):
         1. Log user query to QueryLogger
-        2. Perform semantic search for relevant chunks
-        3. Generate simple response from top results
-        4. Log response and return to user
-
-    Future Implementation (Phase 3):
-        1. Log user query
         2. Call FastAgent orchestrator
         3. Orchestrator routes to appropriate agent (analyst, retrieval, web_search)
         4. Generate sophisticated response with multi-source synthesis
         5. Log response and return
+
+    Fallback (if orchestrator unavailable):
+        1. Log user query
+        2. Perform direct semantic search (Phase 2 behavior)
+        3. Generate simple response from top results
+        4. Log response and return
 
     Args:
         request: ChatRequest with message, conversation_id, and optional context
@@ -159,51 +241,94 @@ async def chat(
             metadata=request.context
         )
 
-        # Perform semantic search to find relevant document chunks
-        # This is the Phase 2 RAG implementation
-        # In Phase 3, this will be handled by the FastAgent orchestrator
-        search_results = await vector_store.search(
-            query_texts=[request.message],
-            n_results=5,  # Top 5 most relevant chunks
-            where=request.context.get("filters") if request.context else None
-        )
+        # Get orchestrator instance
+        orchestrator = get_orchestrator()
 
-        # Convert search results to SourceReference objects
-        sources: List[SourceReference] = []
-        for result in search_results:
-            doc_id = result.get("metadata", {}).get("document_id")
-            doc_title = None
+        # Phase 3: Use orchestrator if available, otherwise fall back to Phase 2
+        if orchestrator is not None:
+            # PHASE 3: FastAgent Orchestrator Integration
+            logger.info("Using FastAgent orchestrator for response generation")
 
-            # Enrich with document title from registry
-            if doc_id:
-                doc_record = await registry.get_by_id(doc_id)
-                if doc_record:
-                    doc_title = doc_record.filename
+            try:
+                # Call orchestrator with message and context
+                orchestrator_response = await orchestrator.process(
+                    message=request.message,
+                    conversation_id=request.conversation_id,
+                    context=request.context
+                )
 
-            sources.append(SourceReference(
-                document_id=doc_id or "unknown",
-                document_title=doc_title or "Unknown Document",
-                chunk_id=result.get("id", ""),
-                page=result.get("metadata", {}).get("page"),
-                text=result.get("text", ""),
-                relevance_score=result.get("score", 0.0)
-            ))
+                # Extract response components
+                response_text = orchestrator_response["content"]
+                agent_list = orchestrator_response.get("agent_used", ["orchestrator"])
 
-        # Generate response from top search results
-        # Phase 2: Simple concatenation of top results
-        # Phase 3: Will use FastAgent orchestrator for intelligent synthesis
-        if sources:
-            response_text = (
-                f"Based on the available documents, here's what I found:\n\n"
-                f"{sources[0].text}\n\n"
-                f"(This is a Phase 2 basic response. "
-                f"Phase 3 will integrate FastAgent for intelligent synthesis.)"
+                # Convert orchestrator sources to SourceReference objects
+                sources: List[SourceReference] = []
+                for src in orchestrator_response.get("sources", []):
+                    sources.append(SourceReference(
+                        document_id=src.get("document_id", "unknown"),
+                        document_title=src.get("document_title", "Unknown Document"),
+                        chunk_id=src.get("chunk_id", ""),
+                        page=src.get("page"),
+                        text=src.get("text", ""),
+                        relevance_score=src.get("score", 0.0)
+                    ))
+
+                agent_used = "orchestrator" if len(agent_list) > 1 else agent_list[0]
+                implementation_phase = "3"
+
+            except Exception as orchestrator_error:
+                # If orchestrator fails, fall back to Phase 2
+                logger.error(
+                    f"Orchestrator failed, falling back to Phase 2: {orchestrator_error}",
+                    exc_info=True
+                )
+                orchestrator = None  # Trigger fallback below
+
+        if orchestrator is None:
+            # PHASE 2 FALLBACK: Direct vector search
+            logger.warning("Orchestrator not available - using Phase 2 fallback")
+
+            search_results = await vector_store.search(
+                query_texts=[request.message],
+                n_results=5,  # Top 5 most relevant chunks
+                where=request.context.get("filters") if request.context else None
             )
-        else:
-            response_text = (
-                "I couldn't find relevant information in the indexed documents. "
-                "Please try rephrasing your question or ensure documents are processed."
-            )
+
+            # Convert search results to SourceReference objects
+            sources: List[SourceReference] = []
+            for result in search_results:
+                doc_id = result.get("metadata", {}).get("document_id")
+                doc_title = None
+
+                # Enrich with document title from registry
+                if doc_id:
+                    doc_record = await registry.get_by_id(doc_id)
+                    if doc_record:
+                        doc_title = doc_record.filename
+
+                sources.append(SourceReference(
+                    document_id=doc_id or "unknown",
+                    document_title=doc_title or "Unknown Document",
+                    chunk_id=result.get("id", ""),
+                    page=result.get("metadata", {}).get("page"),
+                    text=result.get("text", ""),
+                    relevance_score=result.get("score", 0.0)
+                ))
+
+            # Generate simple response from top results (Phase 2 behavior)
+            if sources:
+                response_text = (
+                    f"Based on the available documents:\n\n{sources[0].text}\n\n"
+                    f"(Using Phase 2 fallback - orchestrator not available)"
+                )
+            else:
+                response_text = (
+                    "I couldn't find relevant information in the indexed documents. "
+                    "Please try rephrasing your question or ensure documents are processed."
+                )
+
+            agent_used = "retrieval"
+            implementation_phase = "2"
 
         # Calculate processing time
         processing_time_ms = (time.time() - start_time) * 1000
@@ -221,14 +346,15 @@ async def chat(
                 }
                 for src in sources
             ],
-            agent_used="retrieval",  # Phase 2: Direct retrieval; Phase 3: orchestrator
+            agent_used=agent_used,
             processing_time_ms=int(processing_time_ms),
             success=True
         )
 
         logger.info(
-            f"Chat response generated: {len(sources)} sources, "
-            f"{processing_time_ms:.2f}ms"
+            f"Chat response generated (Phase {implementation_phase}): "
+            f"agent={agent_used}, sources={len(sources)}, "
+            f"time={processing_time_ms:.2f}ms"
         )
 
         # Return chat response
@@ -236,12 +362,12 @@ async def chat(
             response=response_text,
             sources=sources,
             conversation_id=request.conversation_id,
-            agent_used="retrieval",
+            agent_used=agent_used,
             processing_time_ms=processing_time_ms,
             metadata={
                 "query_type": "question",
-                "phase": "2",
-                "implementation": "basic_rag"
+                "phase": implementation_phase,
+                "implementation": "fastagent" if implementation_phase == "3" else "basic_rag"
             }
         )
 
