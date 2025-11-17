@@ -625,12 +625,29 @@ Your responses should be helpful, accurate, and cite sources appropriately."""
         """
         Call the analyst agent for summarization/analysis.
 
+        This method invokes the analyst sub-agent to perform deep analysis
+        on the provided query and context. The analyst can summarize content,
+        extract entities, identify themes, and provide creative insights.
+
         Args:
-            query: Analysis query
-            context: Optional context (sources, etc.)
+            query: Analysis query (e.g., "Summarize Gandalf's character arc")
+            context: Optional context containing:
+                - sources: List of source documents to analyze
+                - analysis_type: Specific type of analysis requested
+                - Any other contextual information
 
         Returns:
-            Dict with content
+            Dict containing:
+                - content (str): Analysis result text
+                - sources (List[Dict]): Source references used in analysis
+            Returns {"content": ""} if analyst agent not available.
+
+        Example:
+            >>> result = await self._call_analyst_agent(
+            ...     query="Analyze the theme of power",
+            ...     context={"sources": retrieval_results}
+            ... )
+            >>> print(result["content"])
         """
         if not self.analyst_agent:
             return {"content": ""}
@@ -659,12 +676,30 @@ Your responses should be helpful, accurate, and cite sources appropriately."""
         """
         Call the web search agent for external search.
 
+        This method invokes the web search sub-agent to search external sources
+        when information is not available in the document database. The agent
+        optimizes queries, filters results, and generates summaries with citations.
+
         Args:
-            query: Search query
-            context: Optional context
+            query: Search query (e.g., "What was Tolkien's inspiration for LOTR?")
+            context: Optional context containing:
+                - max_results: Maximum number of search results
+                - search_engine: Preferred search engine (duckduckgo, brave)
+                - filters: Domain filters or other search constraints
 
         Returns:
-            Dict with content and sources
+            Dict containing:
+                - content (str): Summarized search findings
+                - sources (List[Dict]): Web sources with URLs and snippets
+            Returns {"content": "", "sources": []} if web search agent not available.
+
+        Example:
+            >>> result = await self._call_web_search_agent(
+            ...     query="Latest news about Middle-earth adaptations",
+            ...     context={"max_results": 5}
+            ... )
+            >>> for source in result["sources"]:
+            ...     print(f"{source['title']}: {source['url']}")
         """
         if not self.web_search_agent:
             return {"content": "", "sources": []}
