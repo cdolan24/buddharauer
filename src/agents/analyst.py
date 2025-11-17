@@ -28,7 +28,7 @@ Usage:
 """
 
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from dataclasses import dataclass, asdict
 from enum import Enum
 
@@ -527,6 +527,15 @@ Output Format:
             "confidence": 0.4
         }
 
+    # Alias for backwards compatibility with tests
+    async def _analyze_relationship(
+        self,
+        query: str,
+        sources: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Alias for _analyze_relationships for backwards compatibility."""
+        return await self._analyze_relationships(query, sources)
+
     async def _analyze_comparison(
         self,
         query: str,
@@ -593,3 +602,145 @@ Output Format:
 
         # Capitalize properly
         return entity.title() if entity else "Unknown"
+
+    def _extract_entities(self, text: str) -> List[Union[str, Dict[str, str]]]:
+        """
+        Extract named entities from text.
+
+        Uses simple regex/keyword-based extraction for MVP.
+        In production, use a proper NER library (spaCy, transformers).
+
+        Args:
+            text: Text to extract entities from
+
+        Returns:
+            List of entities (can be strings or dicts with type info)
+        """
+        if not text or not text.strip():
+            return []
+
+        entities = []
+
+        # Simple capitalized word pattern (likely proper nouns)
+        import re
+        # Match capitalized words that aren't at sentence start
+        pattern = r'(?<=[.!?]\s)([A-Z][a-z]+)|(?<=\s)([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)'
+        matches = re.findall(pattern, text)
+
+        # Flatten tuples from findall
+        for match in matches:
+            entity = ''.join(match).strip()
+            if entity and len(entity) > 1:  # Filter out single letters
+                # Common words to exclude
+                exclude_words = ['The', 'A', 'An', 'In', 'On', 'At', 'To', 'For', 'With', 'From', 'They', 'He', 'She']
+                if entity not in exclude_words:
+                    entities.append(entity)
+
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_entities = []
+        for entity in entities:
+            if entity not in seen:
+                seen.add(entity)
+                unique_entities.append(entity)
+
+        return unique_entities[:10]  # Limit to top 10
+
+    def _identify_themes(self, text: str) -> List[str]:
+        """
+        Identify common themes from text.
+
+        Uses keyword-based theme detection for MVP.
+        In production, use topic modeling or LLM-based extraction.
+
+        Args:
+            text: Text to identify themes from
+
+        Returns:
+            List of identified themes
+        """
+        if not text or not text.strip():
+            return []
+
+        themes = []
+        text_lower = text.lower()
+
+        # Theme keyword mappings
+        theme_keywords = {
+            "power": ["power", "authority", "control", "dominance", "rule"],
+            "corruption": ["corruption", "corrupt", "evil", "darkness", "temptation"],
+            "friendship": ["friendship", "friend", "companion", "ally", "fellowship"],
+            "loyalty": ["loyalty", "loyal", "faithful", "devotion", "allegiance"],
+            "good vs evil": ["good", "evil", "battle", "conflict", "fight"],
+            "heroism": ["hero", "heroic", "courage", "bravery", "valor"],
+            "sacrifice": ["sacrifice", "sacrificial", "giving up", "loss"],
+            "redemption": ["redemption", "redeem", "forgiveness", "atonement"],
+            "journey": ["journey", "quest", "travel", "adventure", "voyage"],
+            "identity": ["identity", "self", "who am i", "purpose", "destiny"],
+            "family": ["family", "father", "mother", "brother", "sister", "kin"],
+            "love": ["love", "romance", "affection", "caring"],
+            "death": ["death", "die", "mortality", "end", "perish"],
+            "hope": ["hope", "hopeful", "optimism", "faith"],
+            "destiny": ["destiny", "fate", "destined", "prophecy"],
+        }
+
+        # Check for theme keywords
+        for theme, keywords in theme_keywords.items():
+            if any(keyword in text_lower for keyword in keywords):
+                themes.append(theme.title())
+
+        # Remove duplicates
+        themes = list(set(themes))
+
+        return themes[:5]  # Limit to top 5 themes
+
+    def _generate_insights(self, analysis: Dict[str, Any]) -> List[str]:
+        """
+        Generate creative insights from analysis.
+
+        Uses pattern-based insight generation for MVP.
+        In production, use LLM for deeper creative insights.
+
+        Args:
+            analysis: Analysis dictionary with summary, entities, themes
+
+        Returns:
+            List of generated insights
+        """
+        if not analysis or not isinstance(analysis, dict):
+            return []
+
+        insights = []
+
+        # Extract components from analysis
+        summary = analysis.get("summary", "")
+        entities = analysis.get("entities", [])
+        themes = analysis.get("themes", [])
+        analysis_type = analysis.get("analysis_type", "")
+
+        # Generate type-specific insights
+        if "character" in analysis_type.lower():
+            if len(entities) > 0:
+                insights.append(f"This analysis focuses on {len(entities)} key character(s)")
+            if themes:
+                insights.append(f"Character development is influenced by themes of {', '.join(themes[:2])}")
+            insights.append("Character relationships play a crucial role in the narrative")
+
+        elif "location" in analysis_type.lower():
+            insights.append("Setting and environment shape the story's atmosphere")
+            if themes:
+                insights.append(f"The location embodies themes of {', '.join(themes[:2])}")
+
+        elif "theme" in analysis_type.lower():
+            if themes:
+                insights.append(f"Multiple interconnected themes emerge: {', '.join(themes)}")
+            insights.append("Thematic patterns reveal deeper narrative meaning")
+
+        # General insights based on content
+        if len(summary) > 200:
+            insights.append("Complex analysis requires consideration of multiple perspectives")
+
+        if not insights:
+            insights.append("Further analysis could reveal additional patterns and connections")
+
+        return insights[:5]  # Limit to 5 insights
