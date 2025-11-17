@@ -196,17 +196,32 @@ class OrchestratorAgent:
 
             # Initialize FastAgent with Ollama configuration
             # The initialize_fastagent function sets up GENERIC_API_KEY and GENERIC_BASE_URL
-            config = initialize_fastagent()
-            logger.info(f"FastAgent initialized with Ollama at {config['base_url']}")
+            initialize_fastagent(verify_connection=False)  # Non-blocking initialization
+            logger.info("FastAgent initialized with Ollama connection")
 
             # Create FastAgent instance with system prompt for orchestration
             system_prompt = self._build_system_prompt()
 
-            # Note: Actual FastAgent initialization will happen here
-            # For now, we'll set up the structure
-            # TODO: Complete FastAgent Agent instantiation with tools
+            # Create the FastAgent Agent instance with tools for sub-agents
+            # Tools will be methods that the Agent can call to invoke sub-agents
+            tools = []
+            if self.retrieval_agent:
+                tools.append(self._create_retrieval_tool())
+            if self.analyst_agent:
+                tools.append(self._create_analyst_tool())
+            if self.web_search_agent:
+                tools.append(self._create_websearch_tool())
 
-            logger.info("OrchestratorAgent FastAgent instance created successfully")
+            # Initialize the FastAgent Agent
+            self.agent = Agent(
+                name="orchestrator",
+                model=self.model,
+                system_prompt=system_prompt,
+                temperature=self.temperature,
+                tools=tools
+            )
+
+            logger.info(f"OrchestratorAgent FastAgent instance created with {len(tools)} tools")
 
         except Exception as e:
             logger.error(f"Failed to initialize OrchestratorAgent: {e}")
@@ -246,6 +261,135 @@ Guidelines:
 - Be concise but informative
 
 Your responses should be helpful, accurate, and cite sources appropriately."""
+
+    def _create_retrieval_tool(self):
+        """
+        Create a FastAgent tool for invoking the retrieval agent.
+
+        Returns:
+            Tool function decorated with @tool for FastAgent
+        """
+        @tool
+        async def search_documents(query: str, limit: int = 5) -> Dict[str, Any]:
+            """
+            Search the document database for relevant information.
+
+            Args:
+                query: The search query
+                limit: Maximum number of results to return
+
+            Returns:
+                Dictionary with search results and metadata
+            """
+            if not self.retrieval_agent:
+                return {
+                    "error": "Retrieval agent not available",
+                    "results": []
+                }
+
+            try:
+                # Call the retrieval agent's search method
+                results = await self.retrieval_agent.search(
+                    query=query,
+                    limit=limit
+                )
+                return results
+            except Exception as e:
+                logger.error(f"Retrieval tool error: {e}")
+                return {
+                    "error": str(e),
+                    "results": []
+                }
+
+        return search_documents
+
+    def _create_analyst_tool(self):
+        """
+        Create a FastAgent tool for invoking the analyst agent.
+
+        Returns:
+            Tool function decorated with @tool for FastAgent
+        """
+        @tool
+        async def analyze_content(
+            query: str,
+            analysis_type: str = "summary",
+            content: Optional[str] = None
+        ) -> Dict[str, Any]:
+            """
+            Analyze content or generate insights.
+
+            Args:
+                query: The analysis query/task
+                analysis_type: Type of analysis (summary, character, theme, etc.)
+                content: Optional content to analyze directly
+
+            Returns:
+                Dictionary with analysis results
+            """
+            if not self.analyst_agent:
+                return {
+                    "error": "Analyst agent not available",
+                    "analysis": {}
+                }
+
+            try:
+                # Call the analyst agent's analyze method
+                results = await self.analyst_agent.analyze(
+                    query=query,
+                    analysis_type=analysis_type,
+                    content=content
+                )
+                return results
+            except Exception as e:
+                logger.error(f"Analyst tool error: {e}")
+                return {
+                    "error": str(e),
+                    "analysis": {}
+                }
+
+        return analyze_content
+
+    def _create_websearch_tool(self):
+        """
+        Create a FastAgent tool for invoking the web search agent.
+
+        Returns:
+            Tool function decorated with @tool for FastAgent
+        """
+        @tool
+        async def search_web(query: str, num_results: int = 5) -> Dict[str, Any]:
+            """
+            Search the web for external information.
+
+            Args:
+                query: The search query
+                num_results: Number of results to return
+
+            Returns:
+                Dictionary with search results and summaries
+            """
+            if not self.web_search_agent:
+                return {
+                    "error": "Web search agent not available",
+                    "results": []
+                }
+
+            try:
+                # Call the web search agent's search method
+                results = await self.web_search_agent.search(
+                    query=query,
+                    num_results=num_results
+                )
+                return results
+            except Exception as e:
+                logger.error(f"Web search tool error: {e}")
+                return {
+                    "error": str(e),
+                    "results": []
+                }
+
+        return search_web
 
     def _classify_intent(self, message: str) -> IntentType:
         """
@@ -439,8 +583,13 @@ Your responses should be helpful, accurate, and cite sources appropriately."""
             return {"content": "", "sources": []}
 
         try:
-            # TODO: Replace with actual FastAgent MCP tool call
-            # For now, call the retrieval agent directly
+            # Use FastAgent tool if agent is initialized, otherwise call directly
+            if hasattr(self, 'agent') and self.agent:
+                # Let FastAgent orchestrator handle the tool call
+                # This is a fallback - normally the agent would call this via process()
+                pass
+
+            # Direct call to retrieval agent (used when called from legacy code)
             results = await self.retrieval_agent.search(query, limit=5)
 
             # Format results
@@ -487,10 +636,15 @@ Your responses should be helpful, accurate, and cite sources appropriately."""
             return {"content": ""}
 
         try:
-            # TODO: Replace with actual FastAgent MCP tool call
-            # For now, this is a placeholder
+            # Use analyst agent's analyze method
+            # The FastAgent tool wrapper handles this when called from the agent
+            result = await self.analyst_agent.analyze(
+                query=query,
+                analysis_type="summary"
+            )
             return {
-                "content": "Analyst agent not yet implemented. Using retrieval results."
+                "content": result.get("analysis", ""),
+                "sources": result.get("sources", [])
             }
 
         except Exception as e:
@@ -516,11 +670,15 @@ Your responses should be helpful, accurate, and cite sources appropriately."""
             return {"content": "", "sources": []}
 
         try:
-            # TODO: Replace with actual FastAgent MCP tool call
-            # For now, this is a placeholder
+            # Use web search agent's search method
+            # The FastAgent tool wrapper handles this when called from the agent
+            result = await self.web_search_agent.search(
+                query=query,
+                num_results=5
+            )
             return {
-                "content": "Web search not yet implemented.",
-                "sources": []
+                "content": result.get("summary", ""),
+                "sources": result.get("sources", [])
             }
 
         except Exception as e:

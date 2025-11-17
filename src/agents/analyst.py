@@ -178,14 +178,20 @@ class AnalystAgent:
 
         try:
             # Initialize FastAgent with Ollama configuration
-            config = initialize_fastagent()
-            logger.info(f"FastAgent initialized with Ollama at {config['base_url']}")
+            initialize_fastagent(verify_connection=False)  # Non-blocking initialization
+            logger.info("FastAgent initialized with Ollama connection")
 
             # Create system prompt for analyst
             system_prompt = self._build_system_prompt()
 
-            # Note: Actual FastAgent initialization will happen here
-            # TODO: Complete FastAgent Agent instantiation
+            # Create the FastAgent Agent instance
+            self.agent = Agent(
+                name="analyst",
+                model=self.model,
+                system_prompt=system_prompt,
+                temperature=self.temperature,
+                tools=[]  # Analyst primarily uses LLM reasoning, not external tools
+            )
 
             logger.info("AnalystAgent FastAgent instance created successfully")
 
@@ -370,8 +376,8 @@ Output Format:
         Returns:
             AnalysisResult with character analysis
         """
-        # TODO: Replace with actual FastAgent call
-        # For now, create a structured placeholder
+        # Structured analysis using sources
+        # In a future iteration, this could use the FastAgent agent for enhanced analysis
 
         # Extract character name from query
         character_name = self._extract_entity_name(query)

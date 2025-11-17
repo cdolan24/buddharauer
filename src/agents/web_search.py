@@ -158,16 +158,25 @@ class WebSearchAgent:
 
         try:
             # Initialize FastAgent with Ollama configuration
-            config = initialize_fastagent()
-            logger.info(f"FastAgent initialized with Ollama at {config['base_url']}")
+            initialize_fastagent(verify_connection=False)  # Non-blocking initialization
+            logger.info("FastAgent initialized with Ollama connection")
 
             # Create system prompt for web search
             system_prompt = self._build_system_prompt()
 
-            # Note: Actual FastAgent initialization with MCP tools will happen here
-            # TODO: Complete FastAgent Agent instantiation with MCP search tools
+            # Create the FastAgent Agent instance with web search tools
+            # MCP tools for web search will be added via _create_search_tools()
+            tools = self._create_search_tools()
 
-            logger.info("WebSearchAgent FastAgent instance created successfully")
+            self.agent = Agent(
+                name="websearch",
+                model=self.model,
+                system_prompt=system_prompt,
+                temperature=self.temperature,
+                tools=tools
+            )
+
+            logger.info(f"WebSearchAgent FastAgent instance created with {len(tools)} tools")
 
         except Exception as e:
             logger.error(f"Failed to initialize WebSearchAgent: {e}")
@@ -221,6 +230,40 @@ Output Format:
 - Sources: List of URLs with titles and snippets
 - Note any limitations or uncertainties"""
 
+    def _create_search_tools(self) -> List:
+        """
+        Create MCP tools for web search functionality.
+
+        Returns:
+            List of tool functions for FastAgent
+
+        Note:
+            This creates placeholder tools for web search. In production,
+            these should be replaced with actual MCP web search server tools
+            (e.g., DuckDuckGo MCP, Brave Search MCP).
+        """
+        tools = []
+
+        @tool
+        async def search_duckduckgo(query: str, num_results: int = 5) -> List[Dict[str, Any]]:
+            """
+            Search DuckDuckGo for web results.
+
+            Args:
+                query: Search query
+                num_results: Number of results to return
+
+            Returns:
+                List of search result dictionaries
+            """
+            # Placeholder implementation - replace with actual MCP tool call
+            # In production, this would use the DuckDuckGo MCP server
+            logger.info(f"DuckDuckGo search: {query} (placeholder)")
+            return []
+
+        tools.append(search_duckduckgo)
+        return tools
+
     async def search(
         self,
         query: str,
@@ -271,8 +314,8 @@ Output Format:
             optimized_query = self._optimize_query(query)
             logger.info(f"Optimized query: {optimized_query}")
 
-            # Execute search via MCP tools
-            # TODO: Replace with actual MCP tool call
+            # Execute search via helper method
+            # The FastAgent agent will use the search_duckduckgo tool defined in _create_search_tools()
             raw_results = await self._execute_search(optimized_query, limit)
 
             # Filter and rank results
@@ -344,8 +387,11 @@ Output Format:
         Returns:
             List of WebSearchResult objects
         """
-        # TODO: Replace with actual MCP web search tool call
-        # For now, return placeholder results
+        # Placeholder implementation until MCP web search server is configured
+        # To enable actual web search:
+        # 1. Install MCP web search server (e.g., duckduckgo-mcp or brave-search-mcp)
+        # 2. Update _create_search_tools() to use the MCP tool
+        # 3. Configure MCP server in fastagent.config.yaml
 
         logger.warning("MCP web search not yet implemented - returning placeholder")
 
@@ -451,7 +497,8 @@ Output Format:
             results = await self.search(verification_query, max_results=3)
 
             # Analyze results for verification
-            # TODO: Use LLM to analyze search results for verification
+            # Future enhancement: Use the FastAgent agent to analyze search results
+            # and determine if the statement is supported by the sources
 
             return {
                 "statement": statement,

@@ -14,6 +14,11 @@ Agents:
     - Analyst: Summarization and thematic analysis (llama3.2)
     - WebSearch: External web search via MCP tools (mistral:7b)
 
+Note:
+    This module provides lightweight helper functions for creating FastAgent Agent instances.
+    For full-featured agents with additional methods and state management, use the agent
+    classes from src.agents (OrchestratorAgent, RetrievalAgent, AnalystAgent, WebSearchAgent).
+
 Usage:
     >>> from src.utils.fastagent_client import create_orchestrator_agent
     >>> orchestrator = create_orchestrator_agent()
