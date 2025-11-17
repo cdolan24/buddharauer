@@ -238,7 +238,7 @@ class QueryLogger:
             ...     user_id="faraday"
             ... )
         """
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(datetime.UTC).isoformat()
         metadata_json = json.dumps(metadata) if metadata else None
 
         async with aiosqlite.connect(self.db_path) as db:
@@ -403,7 +403,7 @@ class QueryLogger:
 
         params = []
         if days is not None:
-            cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+            cutoff = (datetime.now(datetime.UTC) - timedelta(days=days)).isoformat()
             query += " WHERE timestamp >= ?"
             params.append(cutoff)
 
@@ -444,7 +444,7 @@ class QueryLogger:
         params = []
 
         if days is not None:
-            cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+            cutoff = (datetime.now(datetime.UTC) - timedelta(days=days)).isoformat()
             where_clause = " WHERE timestamp >= ?"
             params.append(cutoff)
 
@@ -528,7 +528,7 @@ class QueryLogger:
             >>> deleted = await logger.delete_old_queries(90)
             >>> print(f"Deleted {deleted} old queries")
         """
-        cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+        cutoff = (datetime.now(datetime.UTC) - timedelta(days=days)).isoformat()
 
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.execute(

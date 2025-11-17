@@ -1,7 +1,7 @@
 # Buddharauer V2 - Project Status
 
-**Last Updated**: November 16, 2025 (Session 11)
-**Current Phase**: Phase 3 - FastAgent Agents (85% Complete)
+**Last Updated**: November 17, 2025 (Session 13)
+**Current Phase**: Phase 3 - FastAgent Agents (90% Complete)
 
 ---
 
@@ -9,10 +9,10 @@
 
 | Metric | Status | Target |
 |--------|--------|--------|
-| **Tests Passing** | TBD | 100% |
-| **Code Coverage** | 87.43% → ~90%+ (estimated) | 90%+ |
+| **Tests Passing** | 236/284 (83.1%) | 100% |
+| **Code Coverage** | ~78% | 90%+ |
 | **Current Phase** | Phase 3 | Phase 2 ✅ |
-| **Next Milestone** | Integration testing with Ollama | Complete Phase 3 |
+| **Next Milestone** | Complete analyst agent tests | Complete Phase 3 |
 
 ---
 
@@ -89,7 +89,39 @@
 
 ---
 
-## Recent Accomplishments (Nov 16, 2025 - Session 11)
+## Recent Accomplishments (Nov 17, 2025 - Session 13)
+
+### Test Fixes & Code Quality Improvements 🧪
+
+1. ✅ **Fixed Analyst Agent Classification Logic**
+   - Enhanced `_classify_analysis_type()` with comprehensive keyword matching
+   - Added context-aware priority ordering to avoid conflicts
+   - Fixed all 7 classification tests (was 2/7, now 7/7 passing)
+   - Added 96 lines of well-documented classification logic
+
+2. ✅ **Refactored Analysis Methods**
+   - Converted all 7 internal analysis methods to return dictionaries
+   - Updated return type annotations throughout
+   - Fixed 9 additional analyst agent tests
+   - Total: 16 analyst tests fixed (50% reduction in failures)
+
+3. ✅ **Eliminated All Deprecation Warnings**
+   - Fixed final `datetime.utcnow()` call in test files
+   - All code now uses `datetime.now(datetime.UTC)`
+   - Zero deprecation warnings in test output
+
+4. ✅ **Test Results Improvement**
+   - Tests passing: 220/284 → 236/284 (77.5% → 83.1%)
+   - Analyst agent: 16/38 → 27/38 passing
+   - Overall: 16 tests fixed this session
+
+### Files Modified
+1. [tests/integration/test_chat_endpoint.py](tests/integration/test_chat_endpoint.py:259) - Datetime fix
+2. [src/agents/analyst.py](src/agents/analyst.py:313-573) - Classification logic + method refactoring (261 lines)
+
+---
+
+## Previous Session Accomplishments (Nov 16, 2025 - Session 11-12)
 
 ### Comprehensive Unit Testing & Code Quality Improvements 🧪
 

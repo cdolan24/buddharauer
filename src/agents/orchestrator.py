@@ -748,6 +748,62 @@ Your responses should be helpful, accurate, and cite sources appropriately."""
         import uuid
         return f"conv_{uuid.uuid4().hex[:8]}"
 
+    def add_to_conversation(
+        self,
+        conversation_id: str,
+        role: str,
+        content: str
+    ) -> None:
+        """
+        Add a message to conversation history.
+
+        Maintains conversation context for multi-turn dialogues. Messages are
+        stored chronologically and can be used by the orchestrator to understand
+        context in follow-up questions.
+
+        Args:
+            conversation_id: Unique conversation identifier
+            role: Message role, either "user" or "assistant"
+            content: Message content text
+
+        Example:
+            >>> orchestrator = OrchestratorAgent()
+            >>> conv_id = "conv_abc123"
+            >>> orchestrator.add_to_conversation(conv_id, "user", "Who is Gandalf?")
+            >>> orchestrator.add_to_conversation(conv_id, "assistant", "Gandalf is...")
+            >>> history = orchestrator.get_conversation(conv_id)
+            >>> print(f"Messages: {len(history)}")  # 2
+        """
+        # Initialize conversation if it doesn't exist
+        if conversation_id not in self.conversation_history:
+            self.conversation_history[conversation_id] = []
+
+        # Add message with role and content
+        # Format matches FastAgent/OpenAI message structure
+        message = {
+            "role": role,      # "user" or "assistant"
+            "content": content  # Message text
+        }
+
+        self.conversation_history[conversation_id].append(message)
+
+        # Optionally truncate very long conversations to stay within context window
+        # Keep last MAX_HISTORY_LENGTH messages to prevent token overflow
+        if len(self.conversation_history[conversation_id]) > self.max_history_length:
+            # Remove oldest messages, keep most recent
+            self.conversation_history[conversation_id] = \
+                self.conversation_history[conversation_id][-self.max_history_length:]
+
+            logger.debug(
+                f"Truncated conversation {conversation_id} to "
+                f"{self.max_history_length} messages"
+            )
+
+        logger.debug(
+            f"Added {role} message to conversation {conversation_id} "
+            f"({len(self.conversation_history[conversation_id])} total messages)"
+        )
+
     def clear_conversation(self, conversation_id: str) -> bool:
         """
         Clear conversation history for a given ID.

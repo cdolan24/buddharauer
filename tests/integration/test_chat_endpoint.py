@@ -256,7 +256,7 @@ class TestConversationHistory:
                 processing_time_ms=1234,
                 success=1,
                 error_message=None,
-                timestamp=datetime.utcnow().isoformat(),
+                timestamp=datetime.now(datetime.UTC).isoformat(),
                 metadata=None
             )
         ]

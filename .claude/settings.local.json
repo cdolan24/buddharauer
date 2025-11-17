@@ -24,7 +24,16 @@
       "Bash(ollama pull:*)",
       "Bash(.gitignore)",
       "Bash(ollama list:*)",
-      "Bash(pytest:*)"
+      "Bash(pytest:*)",
+      "Bash(Extract named entities from text.)",
+      "Bash(__NEW_LINE__ Simple regex/keyword-based extraction for MVP.)",
+      "Bash(In production, use NER library.)",
+      "Bash(\"\"\"\n    # Simple implementation for MVP\n    # Look for capitalized words, common patterns\n    # Return structured entity list\n    pass\n\ndef _identify_themes(self, text: str) -> List[str]:\n    \"\"\")",
+      "Bash(Identify common themes from text.)",
+      "Bash(__NEW_LINE__ Keyword-based theme detection for MVP.)",
+      "Bash(\"\"\"\n    # Check for theme-related keywords\n    # Return list of identified themes\n    pass\n\ndef _generate_insights(self, analysis: Dict[str, Any]) -> List[str]:\n    \"\"\")",
+      "Bash(Generate creative insights from analysis.)",
+      "Bash(__NEW_LINE__ Pattern-based insight generation for MVP.)"
     ],
     "deny": [],
     "ask": []

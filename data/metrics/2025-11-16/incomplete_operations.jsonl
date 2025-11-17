@@ -1,0 +1,2 @@
+{"name": "incomplete_operations", "value": 1, "type": "gauge", "timestamp": 1763356438.2932248, "labels": {"directory": "C:\\Users\\doodl\\AppData\\Local\\Temp\\pytest-of-doodl\\pytest-46\\test_orchestrator_recovery0\\pdfs", "recursive": "True"}}
+{"name": "incomplete_operations", "value": 1, "type": "gauge", "timestamp": 1763356563.5451553, "labels": {"directory": "C:\\Users\\doodl\\AppData\\Local\\Temp\\pytest-of-doodl\\pytest-47\\test_orchestrator_recovery0\\pdfs", "recursive": "True"}}

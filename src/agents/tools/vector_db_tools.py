@@ -22,6 +22,7 @@ Usage:
 
 import logging
 from typing import List, Dict, Any, Optional
+from dataclasses import asdict
 
 # FastAgent imports (conditional)
 try:
@@ -212,27 +213,40 @@ def create_chunk_context_tool(vector_store: VectorStore):
                 if i >= 0:  # Don't go below 0
                     chunk_ids.append(f"{document_id}_chunk_{i:03d}")
 
-            # Retrieve chunks (this is a simplified implementation)
-            # In production, VectorStore should have a get_by_id method
-            chunks = []
-            for cid in chunk_ids:
-                # Placeholder - actual implementation would query vector_store
-                # by chunk_id directly
-                logger.debug(f"Retrieving chunk: {cid}")
+            # Retrieve chunks using VectorStore.get_by_ids()
+            # This efficiently fetches all chunks in a single operation
+            chunks = vector_store.get_by_ids(chunk_ids)
+
+            # Find the target chunk and split into before/after
+            target_idx = before  # Target chunk is at index 'before' in results
+            target_chunk = chunks[target_idx] if target_idx < len(chunks) else None
+
+            # Split chunks into before and after groups
+            before_chunks = [c for c in chunks[:target_idx] if c is not None]
+            after_chunks = [c for c in chunks[target_idx + 1:] if c is not None]
+
+            # Combine all text for total context
+            # Useful for passing full context to agent
+            total_context = ""
+            if before_chunks:
+                total_context += "\n\n".join(c.text for c in before_chunks) + "\n\n"
+            if target_chunk:
+                total_context += target_chunk.text
+            if after_chunks:
+                total_context += "\n\n" + "\n\n".join(c.text for c in after_chunks)
 
             logger.info(
                 f"Context retrieval for {chunk_id}: "
-                f"{before} before, {after} after"
+                f"{len(before_chunks)} before, {len(after_chunks)} after"
             )
 
             return {
                 "chunk_id": chunk_id,
-                "chunk": None,  # Would be the actual chunk
-                "before_chunks": [],  # Would be chunks before
-                "after_chunks": [],  # Would be chunks after
+                "chunk": target_chunk.to_dict() if target_chunk and hasattr(target_chunk, 'to_dict') else (asdict(target_chunk) if target_chunk else None),
+                "before_chunks": [asdict(c) for c in before_chunks],
+                "after_chunks": [asdict(c) for c in after_chunks],
                 "document_id": document_id,
-                "total_context": "",  # Combined text
-                "note": "Context retrieval requires get_by_id implementation in VectorStore"
+                "total_context": total_context.strip()
             }
 
         except Exception as e:

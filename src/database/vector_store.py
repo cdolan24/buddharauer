@@ -336,6 +336,64 @@ class VectorStore:
         
         return results
     
+    def get_by_id(self, doc_id: str) -> Optional[Document]:
+        """
+        Retrieve a document by its ID.
+
+        Useful for getting specific document chunks, especially when retrieving
+        context around a specific chunk (e.g., getting surrounding chunks).
+
+        Args:
+            doc_id: Unique identifier of the document to retrieve
+
+        Returns:
+            Document object if found, None otherwise
+
+        Example:
+            >>> store = VectorStore(persist_directory="./db")
+            >>> doc = store.get_by_id("doc_001_chunk_042")
+            >>> if doc:
+            ...     print(f"Found: {doc.text[:50]}...")
+        """
+        # Search through documents for matching ID
+        # Note: Linear search is acceptable for MVP; ChromaDB will optimize this
+        for doc in self.documents:
+            if doc.id == doc_id:
+                return doc
+
+        # Document not found
+        return None
+
+    def get_by_ids(self, doc_ids: List[str]) -> List[Optional[Document]]:
+        """
+        Retrieve multiple documents by their IDs.
+
+        More efficient than calling get_by_id() multiple times when retrieving
+        many documents. Maintains order of input IDs in results.
+
+        Args:
+            doc_ids: List of document IDs to retrieve
+
+        Returns:
+            List of Document objects (or None for IDs not found)
+            Order matches input doc_ids
+
+        Example:
+            >>> store = VectorStore(persist_directory="./db")
+            >>> ids = ["doc_001_chunk_040", "doc_001_chunk_041", "doc_001_chunk_042"]
+            >>> docs = store.get_by_ids(ids)
+            >>> for doc_id, doc in zip(ids, docs):
+            ...     if doc:
+            ...         print(f"{doc_id}: {doc.text[:30]}...")
+        """
+        # Create ID lookup dictionary for O(1) access per document
+        # This is more efficient than nested loops for multiple IDs
+        id_to_doc = {doc.id: doc for doc in self.documents}
+
+        # Return documents in same order as requested IDs
+        # Use .get() to return None for missing IDs instead of raising KeyError
+        return [id_to_doc.get(doc_id) for doc_id in doc_ids]
+
     def delete_collection(self):
         """
         Delete the entire collection and all its documents.

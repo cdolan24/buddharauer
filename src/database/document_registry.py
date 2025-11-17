@@ -251,7 +251,7 @@ class DocumentRegistry:
         if existing:
             raise ValueError(f"Document {filename} already exists with ID {doc_id}")
 
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(datetime.UTC).isoformat()
 
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("""
@@ -393,7 +393,7 @@ class DocumentRegistry:
             ...     doc_id, "failed", error_message="PDF corrupted"
             ... )
         """
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(datetime.UTC).isoformat()
 
         # Set processing_start when status changes to processing
         processing_start = None
@@ -439,14 +439,14 @@ class DocumentRegistry:
         Example:
             >>> await registry.mark_completed(doc_id, chunk_count=150, token_count=5000)
         """
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(datetime.UTC).isoformat()
 
         # Get processing start time to calculate duration
         doc = await self.get_by_id(doc_id)
         processing_time = None
         if doc and doc.processing_start:
             start = datetime.fromisoformat(doc.processing_start)
-            end = datetime.utcnow()
+            end = datetime.now(datetime.UTC)
             processing_time = (end - start).total_seconds()
 
         async with aiosqlite.connect(self.db_path) as db:

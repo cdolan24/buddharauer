@@ -1,0 +1,2 @@
+{"name": "pdf_error_processing_time", "value": 0.0017926692962646484, "type": "histogram", "timestamp": 1763356381.1731286, "labels": {"file": "C:\\Users\\doodl\\AppData\\Local\\Temp\\pytest-of-doodl\\pytest-46\\test_error_handling1\\pdfs\\corrupted.pdf"}}
+{"name": "pdf_error_processing_time", "value": 0.001790761947631836, "type": "histogram", "timestamp": 1763356506.5755792, "labels": {"file": "C:\\Users\\doodl\\AppData\\Local\\Temp\\pytest-of-doodl\\pytest-47\\test_error_handling1\\pdfs\\corrupted.pdf"}}

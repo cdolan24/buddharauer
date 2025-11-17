@@ -330,7 +330,7 @@ Output Format:
                 "sources": [r.to_dict() for r in filtered_results],
                 "query_used": optimized_query,
                 "search_engine": self.search_engine,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(datetime.UTC).isoformat(),
                 "result_count": len(filtered_results)
             }
 
@@ -404,7 +404,7 @@ Output Format:
                         "Install and configure DuckDuckGo or Brave Search MCP server.",
                 relevance_score=0.5,
                 source=self.search_engine,
-                timestamp=datetime.utcnow().isoformat()
+                timestamp=datetime.now(datetime.UTC).isoformat()
             )
         ]
 
