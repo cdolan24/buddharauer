@@ -149,6 +149,7 @@ class OrchestratorAgent:
         self.model = model
         self.temperature = temperature
         self.max_context_length = max_context_length
+        self.max_history_length = 50  # Max messages to keep per conversation
         self.agent = None
         self.conversation_history: Dict[str, List[Dict[str, str]]] = {}
 
@@ -831,3 +832,47 @@ Your responses should be helpful, accurate, and cite sources appropriately."""
             List of message dicts with role and content
         """
         return self.conversation_history.get(conversation_id, [])
+
+    # Private method aliases for test compatibility
+    def _add_to_history(self, conversation_id: str, role: str, content: str) -> None:
+        """Alias for add_to_conversation for test compatibility."""
+        self.add_to_conversation(conversation_id, role, content)
+
+    def _get_conversation_history(
+        self,
+        conversation_id: str,
+        max_length: Optional[int] = None
+    ) -> List[Dict[str, str]]:
+        """
+        Alias for get_conversation with optional max_length parameter.
+
+        Args:
+            conversation_id: Conversation ID
+            max_length: Optional maximum total characters (truncates from end if exceeded)
+
+        Returns:
+            List of message dicts, optionally truncated by character count
+        """
+        history = self.get_conversation(conversation_id)
+
+        if not max_length:
+            return history
+
+        # Truncate by character count from the most recent messages
+        # Work backwards from the end, keeping messages until we exceed max_length
+        truncated = []
+        total_chars = 0
+
+        for msg in reversed(history):
+            msg_length = len(msg["content"])
+            if total_chars + msg_length <= max_length:
+                truncated.insert(0, msg)  # Insert at beginning to maintain order
+                total_chars += msg_length
+            else:
+                break  # Stop adding messages once we'd exceed the limit
+
+        return truncated
+
+    def _clear_conversation_history(self, conversation_id: str) -> None:
+        """Alias for clear_conversation for test compatibility."""
+        self.clear_conversation(conversation_id)
