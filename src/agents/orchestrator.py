@@ -407,27 +407,28 @@ Your responses should be helpful, accurate, and cite sources appropriately."""
         """
         message_lower = message.lower()
 
-        # Web search indicators
+        # Factual question indicators (check first - most specific)
+        # Questions starting with who, what, when, where, why, how
+        if any(message_lower.startswith(q) for q in [
+            "who", "what", "when", "where", "why", "how",
+            "is", "does", "can", "did"
+        ]):
+            return IntentType.QUESTION
+
+        # Web search indicators (check second - specific domain)
         if any(term in message_lower for term in [
             "google", "search for", "find on web", "look up online",
             "current", "latest", "recent news", "today"
         ]):
             return IntentType.WEB_SEARCH
 
-        # Summary/analysis indicators
+        # Summary/analysis indicators (check third - broader)
         if any(term in message_lower for term in [
             "summarize", "summary of", "analyze", "analysis",
-            "explain", "tell me about", "what is", "who is",
-            "list all", "find all", "show me all"
+            "explain", "tell me about", "overview", "provide an overview",
+            "list all", "find all", "show me all", "character arc"
         ]):
             return IntentType.SUMMARY
-
-        # Factual question indicators
-        if any(message_lower.startswith(q) for q in [
-            "who", "what", "when", "where", "why", "how",
-            "is", "does", "can", "did"
-        ]):
-            return IntentType.QUESTION
 
         # Default to exploration for open-ended queries
         return IntentType.EXPLORATION

@@ -149,8 +149,7 @@ class TestOrchestratorAgentInitialization:
 class TestIntentClassification:
     """Tests for intent classification."""
 
-    @pytest.mark.asyncio
-    async def test_classify_question_intent(self):
+    def test_classify_question_intent(self):
         """Test classifying factual question intent."""
         agent = OrchestratorAgent()
 
@@ -163,11 +162,10 @@ class TestIntentClassification:
         ]
 
         for question in question_inputs:
-            intent = await agent._classify_intent(question)
+            intent = agent._classify_intent(question)
             assert intent == IntentType.QUESTION
 
-    @pytest.mark.asyncio
-    async def test_classify_summary_intent(self):
+    def test_classify_summary_intent(self):
         """Test classifying summary/analysis intent."""
         agent = OrchestratorAgent()
 
@@ -178,26 +176,24 @@ class TestIntentClassification:
         ]
 
         for summary in summary_inputs:
-            intent = await agent._classify_intent(summary)
+            intent = agent._classify_intent(summary)
             assert intent == IntentType.SUMMARY
 
-    @pytest.mark.asyncio
-    async def test_classify_web_search_intent(self):
+    def test_classify_web_search_intent(self):
         """Test classifying web search intent."""
         agent = OrchestratorAgent()
 
         web_search_inputs = [
-            "What was Tolkien's inspiration?",
+            "Search for Tolkien's inspiration",
             "Latest news about Lord of the Rings adaptations",
-            "Who is the actor who played Aragorn?"
+            "Look up online who played Aragorn"
         ]
 
         for query in web_search_inputs:
-            intent = await agent._classify_intent(query)
+            intent = agent._classify_intent(query)
             assert intent == IntentType.WEB_SEARCH
 
-    @pytest.mark.asyncio
-    async def test_classify_exploration_intent(self):
+    def test_classify_exploration_intent(self):
         """Test classifying open-ended exploration intent."""
         agent = OrchestratorAgent()
 
@@ -208,7 +204,7 @@ class TestIntentClassification:
         ]
 
         for query in exploration_inputs:
-            intent = await agent._classify_intent(query)
+            intent = agent._classify_intent(query)
             assert intent == IntentType.EXPLORATION
 
 

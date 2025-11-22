@@ -30,7 +30,7 @@ Usage:
 import logging
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 
 # FastAgent imports (conditional)
 try:
@@ -330,7 +330,7 @@ Output Format:
                 "sources": [r.to_dict() for r in filtered_results],
                 "query_used": optimized_query,
                 "search_engine": self.search_engine,
-                "timestamp": datetime.now(datetime.UTC).isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "result_count": len(filtered_results)
             }
 
@@ -404,7 +404,7 @@ Output Format:
                         "Install and configure DuckDuckGo or Brave Search MCP server.",
                 relevance_score=0.5,
                 source=self.search_engine,
-                timestamp=datetime.now(datetime.UTC).isoformat()
+                timestamp=datetime.now(timezone.utc).isoformat()
             )
         ]
 

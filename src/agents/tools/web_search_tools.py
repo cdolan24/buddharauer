@@ -22,7 +22,7 @@ Usage:
 
 import logging
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 # FastAgent imports (conditional)
 try:
@@ -121,7 +121,7 @@ def create_duckduckgo_tool():
                 "count": len(placeholder_results),
                 "query": query,
                 "search_engine": "duckduckgo",
-                "timestamp": datetime.now(datetime.UTC).isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "note": "Placeholder implementation - configure for production use"
             }
 
@@ -236,7 +236,7 @@ def create_brave_search_tool(api_key: Optional[str] = None):
                 "query": query,
                 "search_engine": "brave",
                 "search_type": search_type,
-                "timestamp": datetime.now(datetime.UTC).isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "note": "Placeholder implementation - configure API key for production use"
             }
 
