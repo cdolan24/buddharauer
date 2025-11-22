@@ -321,22 +321,27 @@ When reformulating queries:
             >>> initial_results = await agent.search("Gandalf", limit=10)
             >>> reranked = await agent.rerank_results("Gandalf", initial_results, limit=5)
         """
-        if not self.agent or not results:
-            return results[:limit] if limit else results
+        # Handle empty results
+        if not results:
+            return results
 
         try:
-            # Placeholder for FastAgent-based re-ranking
-            # Actual implementation would use agent to score and reorder
-            logger.info(f"Re-ranking {len(results)} results for query: {query[:50]}...")
+            # Even without FastAgent, we should sort by score (basic re-ranking)
+            # When FastAgent is available, this would use LLM-based re-scoring
+            if self.agent:
+                logger.info(f"Re-ranking {len(results)} results for query: {query[:50]}...")
+                # Placeholder for FastAgent-based re-ranking
+                # Actual implementation would use agent to score and reorder
 
-            # For now, return results sorted by score
+            # Sort results by score (descending)
             sorted_results = sorted(results, key=lambda x: x.score, reverse=True)
             return sorted_results[:limit] if limit else sorted_results
 
         except Exception as e:
             logger.error(f"Re-ranking failed: {e}")
-            # Fall back to original ordering
-            return results[:limit] if limit else results
+            # Fall back to score-based sorting
+            sorted_results = sorted(results, key=lambda x: x.score, reverse=True)
+            return sorted_results[:limit] if limit else sorted_results
 
     def to_dict(self, results: List[SearchResult]) -> List[Dict[str, Any]]:
         """
@@ -397,7 +402,21 @@ async def vector_search_tool(
             n_results=limit,
             where=filters
         )
-        return results
+        # ChromaDB returns dict with 'ids', 'documents', 'metadatas', 'distances'
+        # Convert to list of dicts for MCP tool compatibility
+        if isinstance(results, dict) and 'ids' in results:
+            # Format ChromaDB results as list of dicts
+            formatted_results = []
+            if results.get('ids') and len(results['ids']) > 0:
+                for i in range(len(results['ids'][0])):
+                    formatted_results.append({
+                        'id': results['ids'][0][i] if results['ids'][0] else None,
+                        'text': results['documents'][0][i] if results.get('documents') and results['documents'][0] else '',
+                        'metadata': results['metadatas'][0][i] if results.get('metadatas') and results['metadatas'][0] else {},
+                        'distance': results['distances'][0][i] if results.get('distances') and results['distances'][0] else 0
+                    })
+            return formatted_results
+        return results if isinstance(results, list) else []
     except Exception as e:
         logger.error(f"Vector search tool failed: {e}")
         return []

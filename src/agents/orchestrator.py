@@ -407,30 +407,40 @@ Your responses should be helpful, accurate, and cite sources appropriately."""
         """
         message_lower = message.lower()
 
-        # Factual question indicators (check first - most specific)
-        # Questions starting with who, what, when, where, why, how
-        if any(message_lower.startswith(q) for q in [
-            "who", "what", "when", "where", "why", "how",
-            "is", "does", "can", "did"
-        ]):
-            return IntentType.QUESTION
-
-        # Web search indicators (check second - specific domain)
+        # Web search indicators (check first - very specific domain)
         if any(term in message_lower for term in [
             "google", "search for", "find on web", "look up online",
             "current", "latest", "recent news", "today"
         ]):
             return IntentType.WEB_SEARCH
 
-        # Summary/analysis indicators (check third - broader)
+        # Exploration indicators (check second - broad/open-ended queries)
+        # These are broader than specific questions but more general than summaries
+        if any(term in message_lower for term in [
+            "explore", "tell me about the world", "tell me about the lore",
+            "tell me more about", "relationships between",
+            "what can you tell me"  # "What can you tell me" is exploratory, not a specific question
+        ]):
+            return IntentType.EXPLORATION
+
+        # Summary/analysis indicators (check third - specific analytical requests)
         if any(term in message_lower for term in [
             "summarize", "summary of", "analyze", "analysis",
-            "explain", "tell me about", "overview", "provide an overview",
+            "explain", "overview", "provide an overview",
             "list all", "find all", "show me all", "character arc"
         ]):
             return IntentType.SUMMARY
 
-        # Default to exploration for open-ended queries
+        # Factual question indicators (check fourth - specific questions)
+        # Questions starting with who, what, when, where, why, how
+        # Note: Exploration queries checked first to catch broader patterns
+        if any(message_lower.startswith(q) for q in [
+            "who", "what", "when", "where", "why", "how",
+            "is", "does", "can", "did"
+        ]):
+            return IntentType.QUESTION
+
+        # Default to exploration for other open-ended queries
         return IntentType.EXPLORATION
 
     async def process(
@@ -597,17 +607,30 @@ Your responses should be helpful, accurate, and cite sources appropriately."""
             # Format results
             if results:
                 content = self._format_retrieval_results(results)
-                sources = [
-                    {
-                        "document_id": r.document_id,
-                        "document_title": r.document_title or "Unknown",
-                        "chunk_id": r.chunk_id,
-                        "page": r.page,
-                        "text": r.text[:200] + "..." if len(r.text) > 200 else r.text,
-                        "score": r.score
-                    }
-                    for r in results[:5]  # Limit to top 5 sources
-                ]
+                # Build sources list - handle both dict and object results
+                sources = []
+                for r in results[:5]:  # Limit to top 5 sources
+                    if isinstance(r, dict):
+                        # Handle dict results
+                        sources.append({
+                            "document_id": r.get("document_id", ""),
+                            "document_title": r.get("document_title", "Unknown"),
+                            "chunk_id": r.get("chunk_id", ""),
+                            "page": r.get("page"),
+                            "text": r.get("text", "")[:200] + ("..." if len(r.get("text", "")) > 200 else ""),
+                            "score": r.get("score", 0)
+                        })
+                    else:
+                        # Handle object results
+                        text = r.text if hasattr(r, "text") else ""
+                        sources.append({
+                            "document_id": r.document_id if hasattr(r, "document_id") else "",
+                            "document_title": (r.document_title if hasattr(r, "document_title") else None) or "Unknown",
+                            "chunk_id": r.chunk_id if hasattr(r, "chunk_id") else "",
+                            "page": r.page if hasattr(r, "page") else None,
+                            "text": text[:200] + "..." if len(text) > 200 else text,
+                            "score": r.score if hasattr(r, "score") else 0
+                        })
                 return {"content": content, "sources": sources}
             else:
                 return {
@@ -727,7 +750,7 @@ Your responses should be helpful, accurate, and cite sources appropriately."""
         Format retrieval results into a coherent response.
 
         Args:
-            results: List of SearchResult objects
+            results: List of SearchResult objects or dicts with text/page
 
         Returns:
             Formatted response string
@@ -738,9 +761,17 @@ Your responses should be helpful, accurate, and cite sources appropriately."""
         # Build response from top results
         response_parts = []
         for i, result in enumerate(results[:3], 1):  # Top 3 results
-            page_info = f" (Page {result.page})" if result.page else ""
+            # Handle both dict and object types
+            if isinstance(result, dict):
+                text = result.get("text", "")
+                page = result.get("page")
+            else:
+                text = result.text if hasattr(result, "text") else ""
+                page = result.page if hasattr(result, "page") else None
+
+            page_info = f" (Page {page})" if page else ""
             response_parts.append(
-                f"{i}. {result.text}{page_info}"
+                f"{i}. {text}{page_info}"
             )
 
         return "\n\n".join(response_parts)

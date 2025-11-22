@@ -30,6 +30,14 @@ import logging
 from typing import Optional, Dict, Any
 from pathlib import Path
 
+# HTTP client for Ollama API verification
+try:
+    import httpx
+    HTTPX_AVAILABLE = True
+except ImportError:
+    HTTPX_AVAILABLE = False
+    httpx = None  # For mocking in tests
+
 # FastAgent imports (conditional to avoid import errors during testing)
 try:
     from fastagent import Agent
@@ -37,6 +45,8 @@ try:
     FASTAGENT_AVAILABLE = True
 except ImportError:
     FASTAGENT_AVAILABLE = False
+    Agent = None  # For mocking in tests
+    AgentConfig = None  # For mocking in tests
     logging.warning("FastAgent not available. Agent creation will fail.")
 
 from src.utils.config import load_config
@@ -437,9 +447,14 @@ def verify_ollama_models(required_models: Optional[list] = None) -> Dict[str, bo
             "nomic-embed-text"
         ]
 
+    # Check if httpx is available
+    if not HTTPX_AVAILABLE or httpx is None:
+        logger.warning("httpx not available - cannot verify Ollama models")
+        return {model: False for model in required_models}
+
     try:
-        import httpx
         base_url = os.environ.get("GENERIC_BASE_URL", DEFAULT_OLLAMA_BASE_URL)
+        # Convert OpenAI-compatible endpoint to Ollama API endpoint
         tags_url = base_url.replace("/v1", "/api/tags")
 
         response = httpx.get(tags_url, timeout=5.0)
